@@ -8,3 +8,6 @@ main.native: *.ml*
 mini-c:
 	ln -s main.native $@
 
+clean:
+	ocamlbuild -clean
+	rm mini-c
