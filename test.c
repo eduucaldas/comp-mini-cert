@@ -8,5 +8,8 @@ int main2() {
         return 1;
 }
 int main() {
-        return -1;
+        int a;
+        1-2+3;
+        1+4-2;
+        return 1-2*3+5<12224&&1||!0;
 }

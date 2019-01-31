@@ -22,13 +22,34 @@ let eq_of_type t1 t2 =
   | (Tint, Tint) -> true
   | _ -> assert false
 
-let rec type_expr (ctx: context) = function
+let rec type_expr (ctx: context) (expr: Ptree.expr) =
+  match expr.expr_node with
   | Ptree.Econst c -> {expr_typ = Tint; expr_node = Ttree.Econst c}
-  | Ptree.Eunop (Unot, e) -> {expr_typ = Tint; expr_node = (type_expr ctx e.expr_node).expr_node}
-  | Ptree.Eunop (Uminus, e) -> let expr_typed = type_expr ctx e.expr_node in 
-                                if eq_of_type expr_typed.expr_typ Tint then
-                                {expr_typ = Tint; expr_node = (type_expr ctx e.expr_node).expr_node}
-                                else assert false
+  | Ptree.Eunop (op, e) ->
+    let e_typed = type_expr ctx e in
+    begin match op with
+      | Unot ->
+        {expr_typ = Tint; expr_node = Ttree.Eunop (Unot, e_typed)}
+      | Uminus ->
+        if eq_of_type e_typed.expr_typ Tint then
+          {expr_typ = Tint; expr_node = Ttree.Eunop (Uminus, e_typed)} else
+          assert false
+    end
+  | Ptree.Ebinop (op, e1, e2) ->
+    let e1_typed = type_expr ctx e1 in
+    let e2_typed = type_expr ctx e2 in
+    begin match op with
+      | Beq | Bneq | Blt | Ble | Bgt | Bge ->
+        if (eq_of_type e1_typed.expr_typ e2_typed.expr_typ) then
+          {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
+          assert false
+      | Badd | Bsub | Bmul | Bdiv ->
+        if (eq_of_type e1_typed.expr_typ Tint) && (eq_of_type e2_typed.expr_typ Tint) then
+          {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
+          assert false
+      | Band | Bor ->
+        {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
+    end
   | _ -> assert false
 
 let cast_ident (id:Ptree.ident) =
@@ -44,11 +65,12 @@ let type_decl_var (dv:Ptree.decl_var) =
 let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
   match st.stmt_node with
   | Sreturn e ->
-    let e_typed = type_expr ctx e.expr_node in
+    let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
       assert false
   | Sblock b -> Ttree.Sblock(type_block ctx ret_typ b)
+  | Sexpr e -> Ttree.Sexpr(type_expr ctx e)
   | _ -> assert false
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
