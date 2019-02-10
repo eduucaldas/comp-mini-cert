@@ -37,6 +37,16 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         else raise (Error "type error, not yet implemented message")
       | Larrow (e, id) -> assert false
     end
+  | Ptree.Eassign (lv, e) ->
+    let e_typed = type_expr ctx e in
+    begin match lv with
+      | Lident id ->
+        let id_name = cast_ident id in
+        if Hashtbl.mem ctx id_name && eq_of_type (Hashtbl.find ctx id_name) e_typed.expr_typ then
+          {expr_typ = Hashtbl.find ctx id_name; expr_node = Ttree.Eassign_local (id_name, e_typed)}
+        else raise (Error "type error, not yet implemented message")
+      | Larrow (e, id) -> assert false
+    end
   | Ptree.Eunop (op, e) ->
     let e_typed = type_expr ctx e in
     begin match op with
