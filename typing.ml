@@ -22,9 +22,21 @@ let eq_of_type t1 t2 =
   | (Tint, Tint) -> true
   | _ -> assert false
 
+let cast_ident (id:Ptree.ident) =
+  id.id
+
 let rec type_expr (ctx: context) (expr: Ptree.expr) =
   match expr.expr_node with
   | Ptree.Econst c -> {expr_typ = Tint; expr_node = Ttree.Econst c}
+  | Ptree.Eright lv ->
+    begin match lv with
+      | Lident id ->
+        let id_name = cast_ident id in
+        if Hashtbl.mem ctx id_name then
+          {expr_typ = Hashtbl.find ctx id_name; expr_node = Ttree.Eaccess_local id_name}
+        else raise (Error "type error, not yet implemented message")
+      | Larrow (e, id) -> assert false
+    end
   | Ptree.Eunop (op, e) ->
     let e_typed = type_expr ctx e in
     begin match op with
@@ -52,9 +64,6 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
     end
   | _ -> assert false
 
-let cast_ident (id:Ptree.ident) =
-  id.id
-
 let type_typ = function
   | Ptree.Tint -> Ttree.Tint
   | _ -> assert false
@@ -66,7 +75,8 @@ let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
   let unique_set = Hashtbl.create 255 in
   let decl_var_list_typed = List.map type_decl_var dvl in
   let add_if_unique (t, id) =
-    if Hashtbl.mem unique_set id then raise (Error "type error, not yet implemented message")
+    if Hashtbl.mem unique_set id then
+      raise (Error "type error, not yet implemented message")
     else Hashtbl.add unique_set id true;
     Hashtbl.add local_ctx id t
   in
