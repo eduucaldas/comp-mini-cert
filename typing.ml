@@ -95,6 +95,13 @@ let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
   List.iter add_if_unique decl_var_list_typed;
   decl_var_list_typed
 
+let add_function name ret_type formals =
+  if Hashtbl.mem functions name then
+    raise (Error "type error, not yet implemented message")
+  else
+    let formals_type = List.map (fun (t, id) -> t) formals in
+    Hashtbl.add functions name (ret_type, formals_type)
+
 let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
   match st.stmt_node with
   | Sskip -> Ttree.Sskip
@@ -121,13 +128,6 @@ and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let decl_vars_typed = type_decl_var_list local_ctx vars in
   let sts_typed = List.map (type_stmt local_ctx ret_typ) sts in
   (decl_vars_typed, sts_typed)
-
-let add_function name ret_type formals = 
-  if Hashtbl.mem functions fun_name_cast then
-    raise (Error "type error, not yet implemented message")
-  else 
-    let formals_type = List.map (fun (t, id) -> t) formals in
-    Hashtbl.add functions fun_name_cast (ret_type, formals_type);
 
 (* Attention, was VERY sleepy, check fun_body*)
 (* Attention aux recursives *)
