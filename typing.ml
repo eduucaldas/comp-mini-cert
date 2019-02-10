@@ -42,11 +42,11 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
       | Beq | Bneq | Blt | Ble | Bgt | Bge ->
         if (eq_of_type e1_typed.expr_typ e2_typed.expr_typ) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-          assert false
+          raise (Error "type error, not yet implemented message")
       | Badd | Bsub | Bmul | Bdiv ->
         if (eq_of_type e1_typed.expr_typ Tint) && (eq_of_type e2_typed.expr_typ Tint) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-          assert false
+          raise (Error "type error, not yet implemented message")
       | Band | Bor ->
         {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
     end
@@ -66,7 +66,7 @@ let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
   let unique_set = Hashtbl.create 255 in
   let decl_var_list_typed = List.map type_decl_var dvl in
   let add_if_unique (t, id) =
-    if Hashtbl.mem unique_set id then assert false
+    if Hashtbl.mem unique_set id then raise (Error "type error, not yet implemented message")
     else Hashtbl.add unique_set id true;
     Hashtbl.add local_ctx id t
   in
@@ -91,7 +91,7 @@ let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
-      assert false
+      raise (Error "type error, not yet implemented message")
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let local_ctx = Hashtbl.copy ctx in
