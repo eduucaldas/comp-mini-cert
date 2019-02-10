@@ -62,39 +62,53 @@ let type_typ = function
 let type_decl_var (dv:Ptree.decl_var) =
   let (t, id) = dv in (type_typ t, cast_ident id)
 
+let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
+  let unique_set = Hashtbl.create 255 in
+  let decl_var_list_typed = List.map type_decl_var dvl in
+  let add_if_unique (t, id) =
+    if Hashtbl.mem unique_set id then assert false
+    else Hashtbl.add unique_set id true;
+    Hashtbl.add local_ctx id t
+  in
+  List.iter add_if_unique decl_var_list_typed;
+  decl_var_list_typed
+
 let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
   match st.stmt_node with
+  | Sskip -> Ttree.Sskip
+  | Sexpr e -> Ttree.Sexpr(type_expr ctx e)
+  | Sif (e, s1, s2) ->
+    let e_typed = type_expr ctx e in
+    let s1_typed = type_stmt ctx ret_typ s1 in
+    let s2_typed = type_stmt ctx ret_typ s2 in
+    Ttree.Sif (e_typed, s1_typed, s2_typed)
+  | Swhile (e, s) ->
+    let e_typed = type_expr ctx e in
+    let s_typed = type_stmt ctx ret_typ s in
+    Ttree.Swhile (e_typed, s_typed)
+  | Sblock b -> Ttree.Sblock(type_block ctx ret_typ b)
   | Sreturn e ->
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
       assert false
-  | Sblock b -> Ttree.Sblock(type_block ctx ret_typ b)
-  | Sexpr e -> Ttree.Sexpr(type_expr ctx e)
-  | _ -> assert false
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
+  let local_ctx = Hashtbl.copy ctx in
   let (vars, sts) = block in
-  let decl_vars_typed = List.map type_decl_var vars in
-  let sts_typed = List.map (type_stmt ctx ret_typ) sts in
+  let decl_vars_typed = type_decl_var_list local_ctx vars in
+  let sts_typed = List.map (type_stmt local_ctx ret_typ) sts in
   (decl_vars_typed, sts_typed)
 
-
+(* Attention, was VERY sleepy, check fun_body*)
 (* Attention aux recursives *)
 let type_decl_fun (ctx: context) (df: Ptree.decl_fun) =
-  let local_ctx = Hashtbl.copy ctx in
   let fun_typ_typed = type_typ df.fun_typ in
   let fun_name_cast = cast_ident df.fun_name in
-  Hashtbl.add local_ctx fun_name_cast fun_typ_typed;
-  let fun_formals_typed = List.map type_decl_var df.fun_formals in
-  List.iter (fun (t, _) -> is_well_defined t) fun_formals_typed;
-  let add_to_local formal =
-    let (typ, id) = formal in
-    Hashtbl.add local_ctx id typ;
-  in
-  List.iter add_to_local fun_formals_typed;
-  let fun_body_typed = type_block local_ctx fun_typ_typed df.fun_body in
   Hashtbl.add ctx fun_name_cast fun_typ_typed;
+  let local_ctx = Hashtbl.copy ctx in
+  let fun_formals_typed = type_decl_var_list local_ctx df.fun_formals in
+  let fun_body_typed = type_block local_ctx fun_typ_typed df.fun_body in
   {
     fun_typ = fun_typ_typed;
     fun_name = fun_name_cast;
