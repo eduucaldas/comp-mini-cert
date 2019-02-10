@@ -7,6 +7,8 @@ exception Error of string
 (* we have to store the context in some way *)
 type context = (Ttree.ident, Ttree.typ) Hashtbl.t
 
+let (functions: (Ttree.ident, Ttree.typ * Ttree.typ list) Hashtbl.t) = Hashtbl.create 255
+
 let string_of_type = function
   | Tint       -> "int"
   | Tstructp x -> "struct " ^ x.str_name ^ " *"
@@ -120,15 +122,21 @@ and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let sts_typed = List.map (type_stmt local_ctx ret_typ) sts in
   (decl_vars_typed, sts_typed)
 
+let add_function name ret_type formals = 
+  if Hashtbl.mem functions fun_name_cast then
+    raise (Error "type error, not yet implemented message")
+  else 
+    let formals_type = List.map (fun (t, id) -> t) formals in
+    Hashtbl.add functions fun_name_cast (ret_type, formals_type);
+
 (* Attention, was VERY sleepy, check fun_body*)
 (* Attention aux recursives *)
 let type_decl_fun (ctx: context) (df: Ptree.decl_fun) =
   let fun_typ_typed = type_typ df.fun_typ in
   let fun_name_cast = cast_ident df.fun_name in
-  if Hashtbl.mem ctx fun_name_cast then raise (Error "type error, not yet implemented message")
-  else Hashtbl.add ctx fun_name_cast fun_typ_typed;
   let local_ctx = Hashtbl.copy ctx in
   let fun_formals_typed = type_decl_var_list local_ctx df.fun_formals in
+  add_function fun_name_cast fun_typ_typed fun_formals_typed;
   let fun_body_typed = type_block local_ctx fun_typ_typed df.fun_body in
   {
     fun_typ = fun_typ_typed;
