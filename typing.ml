@@ -90,12 +90,13 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
     end
   | Ptree.Ecall (id, e_list) ->
     if Hashtbl.mem functions (cast_ident id) then
-      let (_, formals_type) = Hashtbl.find functions (cast_ident id) in
-      let e_list_typed = List.map type_expr e_list in
-      let e_type_list = List.map (fun (id, t) -> t) e_list_typed in
+      let (ret_type, formals_type) = Hashtbl.find functions (cast_ident id) in
+      let e_list_typed = List.map (type_expr ctx) e_list in
+      let e_type_list = List.map (fun e -> e.expr_typ) e_list_typed in
       if List.fold_left2 (fun acc t1 t2 -> acc && eq_of_type t1 t2) true formals_type e_type_list then
-        Ttree.Ecall (cast_ident id, e_list_typed)
+        {expr_typ = ret_type;expr_node = Ttree.Ecall (cast_ident id, e_list_typed)}
       else raise_expr_error "not yet implemented message"
+    else raise_expr_error "not yet implemented message"
   | _ -> assert false
 
 let type_typ = function
