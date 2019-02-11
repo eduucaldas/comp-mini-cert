@@ -10,14 +10,17 @@ type context = (Ttree.ident, Ttree.typ) Hashtbl.t
 let (functions: (Ttree.ident, Ttree.typ * Ttree.typ list) Hashtbl.t) = Hashtbl.create 255
 
 let string_of_loc (l:(Lexing.position * Lexing.position)) =
+  let file_of_pos (pos:Lexing.position) = if (String.equal pos.pos_fname "") then "" else " file:" ^ pos.pos_fname in
+  let line_of_pos (pos:Lexing.position) = " line:" ^ (string_of_int pos.pos_lnum) in
+  let col_of_pos (pos:Lexing.position) = " col:" ^ (string_of_int (pos.pos_cnum - pos.pos_bol)) in
   let pos1, pos2 = l in
-  let sf1, sf2 = pos1.pos_fname, pos2.pos_fname in
-  let sl1, sl2 = string_of_int pos1.pos_lnum, string_of_int pos2.pos_lnum in
-  let sc1, sc2 = string_of_int (pos1.pos_cnum - pos1.pos_bol), string_of_int (pos2.pos_cnum - pos2.pos_bol) in
-  "in file:" ^ sf1 ^ " line:" ^ sl1 ^ " col:" ^ sc1  ^  " - " ^ (
-    if not (String.equal sf1 sf2) then "file:" ^ sf2 ^ " line:" ^ sl2 ^ " col:" ^ sc2 else
-    if not (String.equal sl1 sl2) then "line:" ^ sl2 ^ " col:" ^ sc2  else
-    "col:" ^ sc2)
+  let sf1, sf2 = file_of_pos pos1, file_of_pos pos2 in
+  let sl1, sl2 = line_of_pos pos1, line_of_pos pos2 in
+  let sc1, sc2 = col_of_pos pos1, col_of_pos pos2 in
+  "in" ^ sf1 ^ sl1 ^ sc1 ^  " -" ^ (
+    if not (String.equal sf1 sf2) then sf2 ^ sl2 ^ sc2 else
+    if not (String.equal sl1 sl2) then sl2 ^ sc2 else
+   sc2)
 
 let string_of_type = function
   | Tint       -> "int"
@@ -38,6 +41,7 @@ let cast_ident (id:Ptree.ident) =
   id.id
 
 let rec type_expr (ctx: context) (expr: Ptree.expr) =
+  let raise_expr_error msg = raise (Error ((string_of_loc expr.expr_loc) ^ " Type Error:" ^ msg)) in
   match expr.expr_node with
   | Ptree.Econst c -> {expr_typ = Tint; expr_node = Ttree.Econst c}
   | Ptree.Eright lv ->
@@ -46,7 +50,7 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         let id_name = cast_ident id in
         if Hashtbl.mem ctx id_name then
           {expr_typ = Hashtbl.find ctx id_name; expr_node = Ttree.Eaccess_local id_name}
-        else raise (Error "type error, not yet implemented message")
+            else raise_expr_error "not yet implemented message"
       | Larrow (e, id) -> assert false
     end
   | Ptree.Eassign (lv, e) ->
@@ -56,7 +60,7 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         let id_name = cast_ident id in
         if Hashtbl.mem ctx id_name && eq_of_type (Hashtbl.find ctx id_name) e_typed.expr_typ then
           {expr_typ = Hashtbl.find ctx id_name; expr_node = Ttree.Eassign_local (id_name, e_typed)}
-        else raise (Error "type error, not yet implemented message")
+            else raise_expr_error "not yet implemented message"
       | Larrow (e, id) -> assert false
     end
   | Ptree.Eunop (op, e) ->
@@ -76,11 +80,11 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
       | Beq | Bneq | Blt | Ble | Bgt | Bge ->
         if (eq_of_type e1_typed.expr_typ e2_typed.expr_typ) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-          raise (Error "type error, not yet implemented message")
+            raise_expr_error "not yet implemented message"
       | Badd | Bsub | Bmul | Bdiv ->
         if (eq_of_type e1_typed.expr_typ Tint) && (eq_of_type e2_typed.expr_typ Tint) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-          raise (Error "type error, not yet implemented message")
+            raise_expr_error "not yet implemented message"
       | Band | Bor ->
         {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
     end
@@ -98,7 +102,7 @@ let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
   let decl_var_list_typed = List.map type_decl_var dvl in
   let add_if_unique (t, id) =
     if Hashtbl.mem unique_set id then
-      raise (Error "type error, not yet implemented message")
+      raise (Error "type error, not yet implemented message, not respecting unicity")
     else Hashtbl.add unique_set id true;
     Hashtbl.add local_ctx id t
   in
@@ -107,7 +111,7 @@ let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
 
 let add_function name ret_type formals =
   if Hashtbl.mem functions name then
-    raise (Error "type error, not yet implemented message")
+    raise (Error "type error, not yet implemented message, unicity")
   else
     let formals_type = List.map (fun (t, id) -> t) formals in
     Hashtbl.add functions name (ret_type, formals_type)
@@ -130,7 +134,7 @@ let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
-      raise (Error "Type Error(stmt): incoherent with return type:")
+      raise (Error ((string_of_loc st.stmt_loc) ^ " Type Error(stmt): incoherent with return type"))
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let local_ctx = Hashtbl.copy ctx in
@@ -145,7 +149,7 @@ let type_decl_fun (ctx: context) (df: Ptree.decl_fun) =
   let fun_typ_typed = type_typ df.fun_typ in
   let fun_name_cast = cast_ident df.fun_name in
   if Hashtbl.mem ctx fun_name_cast then
-    raise (Error ((string_of_loc df.fun_name.id_loc) ^ ": Type Error(decl_fun): function " ^ fun_name_cast ^ " was already declared"))
+    raise (Error ((string_of_loc df.fun_name.id_loc) ^ " Type Error(decl_fun): function " ^ fun_name_cast ^ " was already declared"))
   else Hashtbl.add ctx fun_name_cast fun_typ_typed;
   let local_ctx = Hashtbl.copy ctx in
   let fun_formals_typed = type_decl_var_list local_ctx df.fun_formals in
