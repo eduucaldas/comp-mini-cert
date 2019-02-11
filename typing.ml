@@ -95,8 +95,8 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
       let e_type_list = List.map (fun e -> e.expr_typ) e_list_typed in
       if List.fold_left2 (fun acc t1 t2 -> acc && eq_of_type t1 t2) true formals_type e_type_list then
         {expr_typ = ret_type;expr_node = Ttree.Ecall (cast_ident id, e_list_typed)}
-      else raise_expr_error "not yet implemented message"
-    else raise_expr_error "not yet implemented message"
+      else raise_expr_error "not yet implemented message1"
+    else raise_expr_error ("function: " ^ (cast_ident id))
   | _ -> assert false
 
 let type_typ = function
@@ -173,14 +173,14 @@ let type_decl_fun (ctx: context) (df: Ptree.decl_fun) =
 
 let type_decl (ctx: context) = function
   | Ptree.Dfun df -> type_decl_fun ctx df
-  | _ -> assert false (* not yetimplemented *)
+  | _ -> assert false (* not yet implemented *)
 
 (* Performs typing on file AST produce via parsing
    Ptree.file -> exn Ttree.file *)
 let rec type_file (ctx: context) = function
   | [] -> {funs = []}
-  | h::t -> { funs = (type_decl ctx h)::((type_file ctx t).funs) }
+  | h::t -> let h_typed = type_decl ctx h in { funs = h_typed::((type_file ctx t).funs) }
 
-let program p =
+let program (p:Ptree.file) =
   let ctx = Hashtbl.create 255 in
   type_file ctx p
