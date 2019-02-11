@@ -9,6 +9,16 @@ type context = (Ttree.ident, Ttree.typ) Hashtbl.t
 
 let (functions: (Ttree.ident, Ttree.typ * Ttree.typ list) Hashtbl.t) = Hashtbl.create 255
 
+let string_of_loc (l:(Lexing.position * Lexing.position)) =
+  let pos1, pos2 = l in
+  let sf1, sf2 = pos1.pos_fname, pos2.pos_fname in
+  let sl1, sl2 = string_of_int pos1.pos_lnum, string_of_int pos2.pos_lnum in
+  let sc1, sc2 = string_of_int (pos1.pos_cnum - pos1.pos_bol), string_of_int (pos2.pos_cnum - pos2.pos_bol) in
+  "in file:" ^ sf1 ^ " line:" ^ sl1 ^ " col:" ^ sc1  ^  " - " ^ (
+    if not (String.equal sf1 sf2) then "file:" ^ sf2 ^ " line:" ^ sl2 ^ " col:" ^ sc2 else
+    if not (String.equal sl1 sl2) then "line:" ^ sl2 ^ " col:" ^ sc2  else
+    "col:" ^ sc2)
+
 let string_of_type = function
   | Tint       -> "int"
   | Tstructp x -> "struct " ^ x.str_name ^ " *"
@@ -120,7 +130,7 @@ let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
-      raise (Error "type error, not yet implemented message")
+      raise (Error "Type Error(stmt): incoherent with return type:")
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let local_ctx = Hashtbl.copy ctx in
@@ -134,6 +144,9 @@ and type_block (ctx: context) (ret_typ: Ttree.typ) block =
 let type_decl_fun (ctx: context) (df: Ptree.decl_fun) =
   let fun_typ_typed = type_typ df.fun_typ in
   let fun_name_cast = cast_ident df.fun_name in
+  if Hashtbl.mem ctx fun_name_cast then
+    raise (Error ((string_of_loc df.fun_name.id_loc) ^ ": Type Error(decl_fun): function " ^ fun_name_cast ^ " was already declared"))
+  else Hashtbl.add ctx fun_name_cast fun_typ_typed;
   let local_ctx = Hashtbl.copy ctx in
   let fun_formals_typed = type_decl_var_list local_ctx df.fun_formals in
   add_function fun_name_cast fun_typ_typed fun_formals_typed;
