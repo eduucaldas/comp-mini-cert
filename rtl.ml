@@ -14,27 +14,20 @@ let binop_to_as = function
   | Ptree.Bdiv -> Ops.Mdiv
   | _ -> assert false
 
-let simplify_expr e_node =
-  match e_node with
-  | Ttree.Eunop (uop, e) -> (
-      match e.expr_node with
-      | Ttree.Econst c -> (
-          match uop with
-          | Ptree.Uminus -> Ttree.Econst (Int32.neg c)
-          | Ptree.Unot -> Ttree.Econst (Int32.lognot c)
-        )
-      | _ -> e_node
-    )
-  | _ -> e_node
-
 let rec expr (e:Ttree.expr) destr destl locals =
-  match simplify_expr e.expr_node with
+  match e.expr_node with
   | Ttree.Econst c -> generate (Rtltree.Econst(c, destr, destl))
-  | Ttree.Ebinop (b, e1, e2) ->
-    let r2_tmp = Register.fresh () in
-    let l_binop = generate (Rtltree.Embinop((binop_to_as b), r2_tmp, destr, destl)) in
-    let l_r2 = expr e2 r2_tmp l_binop locals in
-    expr e1 destr l_r2 locals
+  | Ttree.Eunop (Ptree.Uminus, e) ->
+    let r_tmp = Register.fresh () in
+    let l_unop = generate (Rtltree.Embinop(Ops.Msub, r_tmp, destr, destl)) in
+    let l_r_minus = expr e r_tmp l_unop locals in
+    generate (Rtltree.Embinop(Ops.Msub, destr, destr, l_r_minus))
+  | Ttree.Ebinop (Ptree.Badd | Ptree.Bsub | Ptree.Bmul | Ptree.Bdiv as b,
+                                                         e1, e2)  ->
+    let r_tmp = Register.fresh () in
+    let l_binop = generate (Rtltree.Embinop((binop_to_as b), r_tmp, destr, destl)) in
+    let l_r = expr e2 r_tmp l_binop locals in
+    expr e1 destr l_r locals
   | Ttree.Eassign_local (id, e) ->
     let r_tmp = Register.fresh () in
     let l_store = generate (Rtltree.Estore(r_tmp, Hashtbl.find locals id, 0, destl)) in
