@@ -38,10 +38,19 @@ let rec expr (e:Ttree.expr) destr destl locals =
     generate (Rtltree.Eload(r_id, 0, destr, destl))
   | _ -> assert false
 
+let rec condition (e:Ttree.expr) l_true l_false locals =
+  let r_tmp = Register.fresh () in
+  let destl = generate (Rtltree.Emubranch(Mjnz, r_tmp, l_true, l_false)) in
+  expr e r_tmp destl locals
+
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
   match s with
   | Ttree.Sskip -> destl
   | Ttree.Sexpr e -> expr e retr destl locals
+  | Ttree.Sif (e, s_true, s_false) ->
+    let l_true = stmt s_true destl retr exitl locals in
+    let l_false = stmt s_false destl retr exitl locals in
+    condition e l_true l_false locals
   | Ttree.Sblock (dv_list, s_list) -> (
       let rec stmt_list = function
         | [] -> destl
