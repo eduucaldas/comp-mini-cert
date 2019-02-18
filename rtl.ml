@@ -30,13 +30,17 @@ let rec expr (e:Ttree.expr) destr destl locals =
     expr e1 destr l_r locals
   | Ttree.Eassign_local (id, e) ->
     let r_tmp = Register.fresh () in
-    let l_store = generate (Rtltree.Estore(r_tmp, Hashtbl.find locals id, 0, destl)) in
+    let r_id = Hashtbl.find locals id in
+    let l_store = generate (Rtltree.Estore(r_tmp, r_id, 0, destl)) in
     expr e r_tmp l_store locals
+  | Ttree.Eaccess_local id ->
+    let r_id = Hashtbl.find locals id in
+    generate (Rtltree.Eload(r_id, 0, destr, destl))
   | _ -> assert false
 
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
   match s with
-  | Ttree.Sreturn e -> expr e retr exitl locals
+  | Ttree.Sskip -> destl
   | Ttree.Sexpr e -> expr e retr destl locals
   | Ttree.Sblock (dv_list, s_list) -> (
       let rec stmt_list = function
@@ -45,6 +49,7 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
       in
       stmt_list s_list
     )
+  | Ttree.Sreturn e -> expr e retr exitl locals
   | _ -> assert false
 
 
