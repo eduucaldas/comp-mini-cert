@@ -70,6 +70,12 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
     let l_true = stmt s_true destl retr exitl locals in
     let l_false = stmt s_false destl retr exitl locals in
     condition e l_true l_false locals
+  | Ttree.Swhile (e, s) ->
+    let l_decision = Label.fresh () in
+    let l_s = stmt s l_decision retr exitl locals in
+    let l_condition = condition e l_s destl locals in
+    graph := Label.M.add l_decision (Label.M.find l_condition !graph) !graph;
+    generate (Rtltree.Egoto l_decision)
   | Ttree.Sblock (dv_list, s_list) -> (
       let rec stmt_list = function
         | [] -> destl
@@ -78,7 +84,6 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
       stmt_list s_list
     )
   | Ttree.Sreturn e -> expr e retr exitl locals
-  | _ -> assert false
 
 
 let deffun (df:Ttree.decl_fun) =
