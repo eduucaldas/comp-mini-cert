@@ -76,7 +76,6 @@ and expr (e:Ttree.expr) destr destl locals =
     in
     List.fold_right2 eval_parameter e_list reg_list l_fun
   | Ttree.Esizeof s -> generate (Rtltree.Econst(Int32.of_int s.str_size, destr, destl))
-  | _ -> assert false
 
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
   match s with
@@ -92,15 +91,19 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
     let l_condition = condition e l_s destl locals in
     graph := Label.M.add l_decision (Label.M.find l_condition !graph) !graph;
     generate (Rtltree.Egoto l_decision)
-  | Ttree.Sblock (dv_list, s_list) -> (
+  | Ttree.Sblock (dv_list, s_list) -> 
+      let locals_block = Hashtbl.copy locals in
+      let allocate_local_register dv =
+        let reg = Register.fresh () in
+        Hashtbl.add locals_block (snd dv) reg
+      in
+      List.iter allocate_local_register dv_list;
       let rec stmt_list = function
         | [] -> destl
-        | h::t -> stmt h (stmt_list t) retr exitl locals
+        | h::t -> stmt h (stmt_list t) retr exitl locals_block
       in
       stmt_list s_list
-    )
   | Ttree.Sreturn e -> expr e retr exitl locals
-
 
 let deffun (df:Ttree.decl_fun) =
   graph := Label.M.empty;
