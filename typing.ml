@@ -226,17 +226,18 @@ let type_decl_struct ds =
     raise (Error ((string_of_loc id.id_loc) ^ " Type Error(decl_struct): struct " ^ id.id ^ " was already declared"))
   else
     let (fields: (Ttree.ident, Ttree.field) Hashtbl.t) = Hashtbl.create 255 in
-    Hashtbl.add structs id.id {str_name = id.id; str_fields = fields};
-    let valid_field (t, id) =
+    Hashtbl.add structs id.id {str_name = id.id; str_fields = fields; str_size = 0};
+    let valid_field pos (t, id) =
       if Hashtbl.mem fields (cast_ident id) then
         raise (Error ((string_of_loc id.id_loc) ^ " Type Error(decl_struct): struct field " ^ id.id ^ " was already declared"))
-      else if is_well_defined t then
-        Hashtbl.add fields (cast_ident id) {field_name = cast_ident id; field_typ = type_typ t}
+      else if is_well_defined t then (
+        Hashtbl.add fields (cast_ident id) {field_name = cast_ident id; field_typ = type_typ t; field_pos = pos};
+        pos + 8 )
       else
         raise (Error ((string_of_loc id.id_loc) ^ " Type Error(decl_struct): struct field " ^ id.id ^ " is not well defined"))
     in
-    List.iter valid_field dvl;
-    Hashtbl.replace structs id.id {str_name = id.id; str_fields = fields}
+    let size = List.fold_left valid_field 0 dvl in
+    Hashtbl.replace structs id.id {str_name = id.id; str_fields = fields; str_size = size}
 
 
 (* Performs typing on file AST produce via parsing
