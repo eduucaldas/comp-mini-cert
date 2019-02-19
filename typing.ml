@@ -53,7 +53,10 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
   (* TODO: fix col:-1 on error message *)
   let raise_expr_error msg = raise (Error ((string_of_loc expr.expr_loc) ^ " Type Error: " ^ msg)) in
   match expr.expr_node with
-  | Ptree.Econst c -> {expr_typ = Tint; expr_node = Ttree.Econst c}
+  | Ptree.Econst c -> 
+    if Int32.equal c Int32.zero then
+      {expr_typ = Ttypenull; expr_node = Ttree.Econst c}
+    else {expr_typ = Tint; expr_node = Ttree.Econst c}
   | Ptree.Eright lv ->
     begin match lv with
       | Lident id ->
@@ -184,7 +187,7 @@ let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
-      raise (Error ((string_of_loc st.stmt_loc) ^ " Type Error(stmt): incoherent with return type"))
+      raise (Error ((string_of_loc st.stmt_loc) ^ " Type Error(stmt): type " ^ (string_of_type e_typed.expr_typ) ^ " incoherent with return type " ^ (string_of_type ret_typ)))
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let local_ctx = Hashtbl.copy ctx in
