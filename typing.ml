@@ -14,7 +14,7 @@ let (structs: (Ttree.ident, Ttree.structure) Hashtbl.t) = Hashtbl.create 255
 let string_of_loc (l:(Lexing.position * Lexing.position)) =
   let file_of_pos (pos:Lexing.position) = if (String.equal pos.pos_fname "") then "" else " file:" ^ pos.pos_fname in
   let line_of_pos (pos:Lexing.position) = " line:" ^ (string_of_int pos.pos_lnum) in
-  let col_of_pos (pos:Lexing.position) = " col:" ^ (string_of_int (pos.pos_cnum - pos.pos_bol)) in
+  let col_of_pos (pos:Lexing.position) = " col:" ^ (string_of_int (pos.pos_cnum - pos.pos_bol + 1)) in
   let pos1, pos2 = l in
   let sf1, sf2 = file_of_pos pos1, file_of_pos pos2 in
   let sl1, sl2 = line_of_pos pos1, line_of_pos pos2 in
@@ -112,12 +112,13 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
     begin match op with
       | Beq | Bneq | Blt | Ble | Bgt | Bge ->
         if (eq_of_type e1_typed.expr_typ e2_typed.expr_typ) then
-          {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-            raise_expr_error "not yet implemented message"
+          {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
+        else
+          raise_expr_error "not yet implemented message binop 1"
       | Badd | Bsub | Bmul | Bdiv ->
         if (eq_of_type e1_typed.expr_typ Tint) && (eq_of_type e2_typed.expr_typ Tint) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-            raise_expr_error "not yet implemented message"
+            raise_expr_error "not yet implemented message binop 2"
       | Band | Bor ->
         {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
     end
