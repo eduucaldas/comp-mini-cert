@@ -12,6 +12,12 @@ let binop_to_as = function
   | Ptree.Bsub -> Ops.Msub
   | Ptree.Bmul -> Ops.Mmul
   | Ptree.Bdiv -> Ops.Mdiv
+  | Ptree.Beq  -> Ops.Msete
+  | Ptree.Bneq -> Ops.Msetne
+  | Ptree.Bge  -> Ops.Msetge
+  | Ptree.Ble  -> Ops.Msetle
+  | Ptree.Bgt  -> Ops.Msetg
+  | Ptree.Blt  -> Ops.Msetl
   | _ -> assert false
 
 let rec expr (e:Ttree.expr) destr destl locals =
@@ -21,9 +27,10 @@ let rec expr (e:Ttree.expr) destr destl locals =
     let r_tmp = Register.fresh () in
     let l_unop = generate (Rtltree.Embinop(Ops.Msub, r_tmp, destr, destl)) in
     let l_r_minus = expr e r_tmp l_unop locals in
-    generate (Rtltree.Embinop(Ops.Msub, destr, destr, l_r_minus))
-  | Ttree.Ebinop (Ptree.Badd | Ptree.Bsub | Ptree.Bmul | Ptree.Bdiv as b,
-                                                         e1, e2)  ->
+    generate (Rtltree.Econst(Int32.zero, destr, l_r_minus))
+  | Ttree.Ebinop (Ptree.Badd | Ptree.Bsub | Ptree.Bmul
+                 | Ptree.Bdiv | Ptree.Beq | Ptree.Bneq | Ptree.Bge
+                 | Ptree.Bgt | Ptree.Ble | Ptree.Blt as b, e1, e2)  ->
     let r_tmp = Register.fresh () in
     let l_binop = generate (Rtltree.Embinop((binop_to_as b), r_tmp, destr, destl)) in
     let l_r = expr e2 r_tmp l_binop locals in
