@@ -31,11 +31,11 @@ let rec expr (e:Ttree.expr) destr destl locals =
   | Ttree.Eassign_local (id, e) ->
     let r_tmp = Register.fresh () in
     let r_id = Hashtbl.find locals id in
-    let l_store = generate (Rtltree.Estore(r_tmp, r_id, 0, destl)) in
+    let l_store = generate (Rtltree.Embinop(Mmov, r_tmp, r_id, destl)) in
     expr e r_tmp l_store locals
   | Ttree.Eaccess_local id ->
     let r_id = Hashtbl.find locals id in
-    generate (Rtltree.Eload(r_id, 0, destr, destl))
+    generate (Rtltree.Embinop(Mmov, r_id, destr, destl))
   | _ -> assert false
 
 let rec condition (e:Ttree.expr) l_true l_false locals =
@@ -46,7 +46,7 @@ let rec condition (e:Ttree.expr) l_true l_false locals =
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
   match s with
   | Ttree.Sskip -> destl
-  | Ttree.Sexpr e -> expr e retr destl locals
+  | Ttree.Sexpr e -> let r = Register.fresh () in expr e r destl locals
   | Ttree.Sif (e, s_true, s_false) ->
     let l_true = stmt s_true destl retr exitl locals in
     let l_false = stmt s_false destl retr exitl locals in
