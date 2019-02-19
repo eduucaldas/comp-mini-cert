@@ -56,9 +56,18 @@ and expr (e:Ttree.expr) destr destl locals =
     let r_id = Hashtbl.find locals id in
     let l_store = generate (Rtltree.Embinop(Mmov, destr, r_id, destl)) in
     expr e destr l_store locals
+  | Ttree.Eassign_field (e1, f, e2) ->
+    let r2 = Register.fresh () in
+    let l_assign = generate (Rtltree.Estore (r2, destr, f.field_pos, destl)) in
+    let l2 = expr e2 r2 l_assign locals in
+    expr e1 destr l2 locals
   | Ttree.Eaccess_local id ->
     let r_id = Hashtbl.find locals id in
     generate (Rtltree.Embinop(Mmov, r_id, destr, destl))
+  | Ttree.Eaccess_field (e, f) ->
+    let r_tmp = Register.fresh () in
+    let l_access = generate (Rtltree.Eload (r_tmp, f.field_pos, destr, destl)) in
+    expr e r_tmp l_access locals
   | Ttree.Ecall (id, e_list) ->
     let reg_list = List.rev_map (fun x -> Register.fresh ()) e_list in
     let l_fun = generate (Rtltree.Ecall (destr, id, reg_list, destl)) in
@@ -66,6 +75,7 @@ and expr (e:Ttree.expr) destr destl locals =
       expr exp reg l_temp locals
     in
     List.fold_right2 eval_parameter e_list reg_list l_fun
+  | Ttree.Esizeof s -> generate (Rtltree.Econst(Int32.of_int s.str_size, destr, destl))
   | _ -> assert false
 
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
