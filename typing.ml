@@ -37,15 +37,21 @@ let rec is_well_defined = function
     else false
 
 let eq_of_type (t1:Ttree.typ) (t2:Ttree.typ) =
+  (* QUESTION: fix struct equals 0 *)
   match (t1, t2) with
-  | (Tint, Tint) -> true
-  | _ -> assert false
+  | (Tint, Tint) | (Tint, Ttypenull) | (Ttypenull, Tint) -> true
+  | (Tstructp s, Ttypenull) | (Ttypenull, Tstructp s) | (Tvoidstar, Tstructp s) | (Tstructp s, Tvoidstar) -> true
+  | (Tvoidstar, Tvoidstar) -> true
+  | (Ttypenull, Ttypenull) -> true
+  | (Tstructp s1, Tstructp s2) -> String.equal s1.str_name s2.str_name
+  | _ -> false
 
 let cast_ident (id:Ptree.ident) =
   id.id
 
 let rec type_expr (ctx: context) (expr: Ptree.expr) =
-  let raise_expr_error msg = raise (Error ((string_of_loc expr.expr_loc) ^ " Type Error:" ^ msg)) in
+  (* TODO: fix col:-1 on error message *)
+  let raise_expr_error msg = raise (Error ((string_of_loc expr.expr_loc) ^ " Type Error: " ^ msg)) in
   match expr.expr_node with
   | Ptree.Econst c -> {expr_typ = Tint; expr_node = Ttree.Econst c}
   | Ptree.Eright lv ->
@@ -74,14 +80,20 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         end
     end
   | Ptree.Eassign (lv, e) ->
+    let lv_typed = type_expr ctx {expr_node = Ptree.Eright (lv); expr_loc = expr.expr_loc} in
     let e_typed = type_expr ctx e in
-    begin match lv with
-      | Lident id ->
-        let id_name = cast_ident id in
-        if Hashtbl.mem ctx id_name && eq_of_type (Hashtbl.find ctx id_name) e_typed.expr_typ then
-          {expr_typ = Hashtbl.find ctx id_name; expr_node = Ttree.Eassign_local (id_name, e_typed)}
-            else raise_expr_error "not yet implemented message"
-      | Larrow (e, id) -> assert false
+    begin match lv_typed.expr_node with
+    | Ttree.Eaccess_local id ->
+      if eq_of_type lv_typed.expr_typ e_typed.expr_typ then
+        {expr_typ = lv_typed.expr_typ; expr_node = Ttree.Eassign_local (id, e_typed)}
+      else
+      raise_expr_error ("variable " ^ id ^ " does not have a compatible type with the expression")
+    | Ttree.Eaccess_field (e, f) ->
+      if eq_of_type lv_typed.expr_typ e_typed.expr_typ then
+        {expr_typ = lv_typed.expr_typ; expr_node = Ttree.Eassign_field (e, f, e_typed)}
+      else
+      raise_expr_error ("field " ^ f.field_name ^ " does not have a compatible type with the expression")
+    | _ -> raise_expr_error ("incompatible left expression")
     end
   | Ptree.Eunop (op, e) ->
     let e_typed = type_expr ctx e in
@@ -90,8 +102,9 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         {expr_typ = Tint; expr_node = Ttree.Eunop (Unot, e_typed)}
       | Uminus ->
         if eq_of_type e_typed.expr_typ Tint then
-          {expr_typ = Tint; expr_node = Ttree.Eunop (Uminus, e_typed)} else
-          assert false
+          {expr_typ = Tint; expr_node = Ttree.Eunop (Uminus, e_typed)}
+        else
+          raise_expr_error ("operator is not compatible with expression")
     end
   | Ptree.Ebinop (op, e1, e2) ->
     let e1_typed = type_expr ctx e1 in
@@ -113,16 +126,19 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
       let (ret_type, formals_type) = Hashtbl.find functions (cast_ident id) in
       let e_list_typed = List.map (type_expr ctx) e_list in
       let e_type_list = List.map (fun e -> e.expr_typ) e_list_typed in
+      try
       if List.fold_left2 (fun acc t1 t2 -> acc && eq_of_type t1 t2) true formals_type e_type_list then
         {expr_typ = ret_type;expr_node = Ttree.Ecall (cast_ident id, e_list_typed)}
       else raise_expr_error "not yet implemented message1"
+      with Invalid_argument a -> raise_expr_error ("invalid arguments on function " ^  (cast_ident id))
     else raise_expr_error ("function: " ^ (cast_ident id))
   | Ptree.Esizeof id ->
-    (* Not sure if id is the name of the struct of the variable*)
+    (* Not possible to do sizeof(int)? *)
     let name = cast_ident id in
     if Hashtbl.mem structs name then
       {expr_typ = Tint; expr_node = Ttree.Esizeof (Hashtbl.find structs name)}
-    else assert false
+    else
+      raise (Error ((string_of_loc id.id_loc) ^ " Type Error: struct " ^ name ^ " was not defined"))
 
 
 let type_typ = function
@@ -132,7 +148,7 @@ let type_typ = function
     if Hashtbl.mem structs id then
       Ttree.Tstructp (Hashtbl.find structs id)
     else
-    raise (Error ((string_of_loc s.id_loc) ^ " Type Error(decl_struct): struct " ^ id ^ " was not defined"))
+      raise (Error ((string_of_loc s.id_loc) ^ " Type Error(decl_struct): struct " ^ id ^ " was not defined"))
 
 let type_decl_var (dv:Ptree.decl_var) =
   let (t, id) = dv in (type_typ t, cast_ident id)
