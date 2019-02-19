@@ -20,7 +20,13 @@ let binop_to_as = function
   | Ptree.Blt  -> Ops.Msetl
   | _ -> assert false
 
-let rec expr (e:Ttree.expr) destr destl locals =
+
+let rec condition (e:Ttree.expr) l_true l_false locals =
+  let r_tmp = Register.fresh () in
+  let destl = generate (Rtltree.Emubranch(Mjnz, r_tmp, l_true, l_false)) in
+  expr e r_tmp destl locals
+
+and expr (e:Ttree.expr) destr destl locals =
   match e.expr_node with
   | Ttree.Econst c -> generate (Rtltree.Econst(c, destr, destl))
   | Ttree.Eunop (Ptree.Uminus, e) ->
@@ -35,6 +41,14 @@ let rec expr (e:Ttree.expr) destr destl locals =
     let l_binop = generate (Rtltree.Embinop((binop_to_as b), r_tmp, destr, destl)) in
     let l_r = expr e2 r_tmp l_binop locals in
     expr e1 destr l_r locals
+  | Ttree.Ebinop (Ptree.Band | Ptree.Bor as b, e1, e2) ->
+    let l_continue = expr e2 destr destl locals in
+    let l_stop = expr e1 destr destl locals in
+    (match b with
+     | Ptree.Band -> condition e1 l_continue l_stop locals
+     | Ptree.Bor -> condition e1 l_stop l_continue locals
+     | _ -> assert false
+    )
   | Ttree.Eassign_local (id, e) ->
     let r_tmp = Register.fresh () in
     let r_id = Hashtbl.find locals id in
@@ -44,11 +58,6 @@ let rec expr (e:Ttree.expr) destr destl locals =
     let r_id = Hashtbl.find locals id in
     generate (Rtltree.Embinop(Mmov, r_id, destr, destl))
   | _ -> assert false
-
-let rec condition (e:Ttree.expr) l_true l_false locals =
-  let r_tmp = Register.fresh () in
-  let destl = generate (Rtltree.Emubranch(Mjnz, r_tmp, l_true, l_false)) in
-  expr e r_tmp destl locals
 
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =
   match s with
