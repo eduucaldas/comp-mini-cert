@@ -32,8 +32,11 @@ and expr (e:Ttree.expr) destr destl locals =
   | Ttree.Eunop (Ptree.Uminus, e) ->
     let r_tmp = Register.fresh () in
     let l_unop = generate (Rtltree.Embinop(Ops.Msub, r_tmp, destr, destl)) in
-    let l_r_minus = expr e r_tmp l_unop locals in
-    generate (Rtltree.Econst(Int32.zero, destr, l_r_minus))
+    let l_zero = generate (Rtltree.Econst(Int32.zero, destr, l_unop)) in
+    expr e r_tmp l_zero locals
+  | Ttree.Eunop (Ptree.Unot, e) ->
+    let l_not = generate (Rtltree.Emunop(Ops.Msetei(Int32.zero), destr, destl)) in
+    expr e destr l_not locals
   | Ttree.Ebinop (Ptree.Badd | Ptree.Bsub | Ptree.Bmul
                  | Ptree.Bdiv | Ptree.Beq | Ptree.Bneq | Ptree.Bge
                  | Ptree.Bgt | Ptree.Ble | Ptree.Blt as b, e1, e2)  ->
