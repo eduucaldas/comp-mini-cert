@@ -53,10 +53,9 @@ and expr (e:Ttree.expr) destr destl locals =
      | _ -> assert false
     )
   | Ttree.Eassign_local (id, e) ->
-    let r_tmp = Register.fresh () in
     let r_id = Hashtbl.find locals id in
-    let l_store = generate (Rtltree.Embinop(Mmov, r_tmp, r_id, destl)) in
-    expr e r_tmp l_store locals
+    let l_store = generate (Rtltree.Embinop(Mmov, destr, r_id, destl)) in
+    expr e destr l_store locals
   | Ttree.Eaccess_local id ->
     let r_id = Hashtbl.find locals id in
     generate (Rtltree.Embinop(Mmov, r_id, destr, destl))
