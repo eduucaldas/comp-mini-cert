@@ -33,6 +33,8 @@ let localisation pos =
   let c = pos.pos_cnum - pos.pos_bol + 1 in
   eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l (c-1) c
 
+let pp_result res = Printf.printf "%d" (Int64.to_int res)
+
 let () =
   Arg.parse options (set_file ifile) usage;
   if !ifile="" then begin eprintf "missing file\n@?"; exit 1 end;
@@ -52,7 +54,7 @@ let () =
     if !type_only then exit 0;
     let p = Rtl.program p in
     if debug then Rtltree.print_file std_formatter p;
-    if !interp_rtl then begin ignore (Rtlinterp.program p); exit 0 end;
+    if !interp_rtl then begin  pp_result (Rtlinterp.program p); exit 0 end;
     (* ... *)
   with
     | Lexer.Lexical_error c ->
