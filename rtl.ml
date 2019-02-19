@@ -60,6 +60,13 @@ and expr (e:Ttree.expr) destr destl locals =
   | Ttree.Eaccess_local id ->
     let r_id = Hashtbl.find locals id in
     generate (Rtltree.Embinop(Mmov, r_id, destr, destl))
+  | Ttree.Ecall (id, e_list) ->
+    let reg_list = List.rev_map (fun x -> Register.fresh ()) e_list in
+    let l_fun = generate (Rtltree.Ecall (destr, id, reg_list, destl)) in
+    let eval_parameter exp reg l_temp = 
+      expr exp reg l_temp locals
+    in
+    List.fold_right2 eval_parameter e_list reg_list l_fun
   | _ -> assert false
 
 let rec stmt (s:Ttree.stmt) destl retr exitl locals =

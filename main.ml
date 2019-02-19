@@ -33,7 +33,7 @@ let localisation pos =
   let c = pos.pos_cnum - pos.pos_bol + 1 in
   eprintf "File \"%s\", line %d, characters %d-%d:\n" !ifile l (c-1) c
 
-let pp_result res = Printf.printf "%d" (Int64.to_int res)
+let pp_result res = Printf.printf "%d\n" (Int64.to_int res)
 
 let () =
   Arg.parse options (set_file ifile) usage;
