@@ -247,5 +247,8 @@ let rec type_file (ctx: context) = function
     type_file ctx t
 
 let program (p:Ptree.file) =
+  (* Add predefined functions *)
+  Hashtbl.add functions "putchar" (Ttree.Tint, [Ttree.Tint]);
+  Hashtbl.add functions "sbrk" (Ttree.Tvoidstar, [Ttree.Tint]);
   let ctx = Hashtbl.create 255 in
   type_file ctx p
