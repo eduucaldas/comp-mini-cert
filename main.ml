@@ -54,7 +54,7 @@ let () =
     if !type_only then exit 0;
     let p = Rtl.program p in
     if debug then Rtltree.print_file std_formatter p;
-    if !interp_rtl then begin pp_result (Rtlinterp.program p); exit 0 end;
+    if !interp_rtl then begin ignore (Rtlinterp.program p); exit 0 end;
     (* ... *)
   with
     | Lexer.Lexical_error c ->
