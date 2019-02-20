@@ -117,11 +117,11 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
         if (eq_of_type e1_typed.expr_typ e2_typed.expr_typ) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
         else
-          raise_expr_error "not yet implemented message binop 1"
+          raise_expr_error ("type " ^ (string_of_type e1_typed.expr_typ) ^ "is not compatible with type " ^ (string_of_type e2_typed.expr_typ))
       | Badd | Bsub | Bmul | Bdiv ->
         if (eq_of_type e1_typed.expr_typ Tint) && (eq_of_type e2_typed.expr_typ Tint) then
           {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)} else
-            raise_expr_error "not yet implemented message binop 2"
+            raise_expr_error "types are not compatible"
       | Band | Bor ->
         {expr_typ = Tint; expr_node = Ttree.Ebinop (op, e1_typed, e2_typed)}
     end
@@ -133,16 +133,16 @@ let rec type_expr (ctx: context) (expr: Ptree.expr) =
       try
       if List.fold_left2 (fun acc t1 t2 -> acc && eq_of_type t1 t2) true formals_type e_type_list then
         {expr_typ = ret_type;expr_node = Ttree.Ecall (cast_ident id, e_list_typed)}
-      else raise_expr_error "not yet implemented message1"
-      with Invalid_argument a -> raise_expr_error ("invalid arguments on function " ^  (cast_ident id))
-    else raise_expr_error ("function: " ^ (cast_ident id))
+      else raise_expr_error ("the paremeters are not compatible with function " ^ (cast_ident id))
+      with Invalid_argument a -> raise_expr_error ("the paremeters are not compatible with function " ^ (cast_ident id))
+    else raise_expr_error ("function " ^ (cast_ident id) ^ " was not defined")
   | Ptree.Esizeof id ->
     (* Not possible to do sizeof(int)? *)
     let name = cast_ident id in
     if Hashtbl.mem structs name then
       {expr_typ = Tint; expr_node = Ttree.Esizeof (Hashtbl.find structs name)}
     else
-      raise (Error ((string_of_loc id.id_loc) ^ " Type Error: struct " ^ name ^ " was not defined"))
+      raise (Error ((string_of_loc id.id_loc) ^ " Type Error(decl_struct): struct " ^ name ^ " was not defined"))
 
 
 let type_typ = function
@@ -160,13 +160,13 @@ let type_decl_var (dv:Ptree.decl_var) =
 let type_decl_var_list (local_ctx: context) (dvl: Ptree.decl_var list) =
   let unique_set = Hashtbl.create 255 in
   let decl_var_list_typed = List.map type_decl_var dvl in
-  let add_if_unique (t, id) =
+  let add_if_unique (t, id) ((t_ptree: Ptree.typ), (id_ptree: Ptree.ident)) =
     if Hashtbl.mem unique_set id then
-      raise (Error "type error, not yet implemented message, not respecting unicity")
+      raise (Error ((string_of_loc id_ptree.id_loc) ^ " Type Error(decl_var): variable named " ^ id ^ " was already declared in the same scope"))
     else Hashtbl.add unique_set id true;
     Hashtbl.add local_ctx id t
   in
-  List.iter add_if_unique decl_var_list_typed;
+  List.iter2 add_if_unique decl_var_list_typed dvl;
   decl_var_list_typed
 
 let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
@@ -187,7 +187,7 @@ let rec type_stmt (ctx: context) (ret_typ: Ttree.typ) (st: Ptree.stmt) =
     let e_typed = type_expr ctx e in
     if (eq_of_type e_typed.expr_typ ret_typ) then
       Ttree.Sreturn e_typed else
-      raise (Error ((string_of_loc st.stmt_loc) ^ " Type Error(stmt): type " ^ (string_of_type e_typed.expr_typ) ^ " incoherent with return type " ^ (string_of_type ret_typ)))
+      raise (Error ((string_of_loc st.stmt_loc) ^ " Type Error(stmt): type " ^ (string_of_type e_typed.expr_typ) ^ " is not compatible with return type " ^ (string_of_type ret_typ)))
 
 and type_block (ctx: context) (ret_typ: Ttree.typ) block =
   let local_ctx = Hashtbl.copy ctx in
