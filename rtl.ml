@@ -103,7 +103,13 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
         | [] -> destl
         | h::t -> stmt h (stmt_list t) retr exitl locals_block
       in
-      stmt_list s_list
+      let l_block = stmt_list s_list in
+      (* Initialize local variables inside the block to zero *)
+      let initialize_local (t, id) l_next = 
+        let reg = Hashtbl.find locals_block id in
+        generate (Rtltree.Econst(Int32.zero, reg, l_next))
+      in
+      List.fold_right initialize_local dv_list l_block
   | Ttree.Sreturn e -> expr e retr exitl locals
 
 let deffun (df:Ttree.decl_fun) =
