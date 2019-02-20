@@ -45,11 +45,12 @@ and expr (e:Ttree.expr) destr destl locals =
     let l_r = expr e2 r_tmp l_binop locals in
     expr e1 destr l_r locals
   | Ttree.Ebinop (Ptree.Band | Ptree.Bor as b, e1, e2) ->
-    let l_continue = expr e2 destr destl locals in
-    let l_stop = expr e1 destr destl locals in
+    let l_true = generate (Rtltree.Econst(Int32.one, destr, destl)) in
+    let l_false = generate (Rtltree.Econst(Int32.zero, destr, destl)) in
+    let l_continue = condition e2 l_true l_false locals in
     (match b with
-     | Ptree.Band -> condition e1 l_continue l_stop locals
-     | Ptree.Bor -> condition e1 l_stop l_continue locals
+     | Ptree.Band -> condition e1 l_continue l_false locals
+     | Ptree.Bor -> condition e1 l_true l_continue locals
      | _ -> assert false
     )
   | Ttree.Eassign_local (id, e) ->
@@ -71,7 +72,7 @@ and expr (e:Ttree.expr) destr destl locals =
   | Ttree.Ecall (id, e_list) ->
     let reg_list = List.rev_map (fun x -> Register.fresh ()) e_list in
     let l_fun = generate (Rtltree.Ecall (destr, id, reg_list, destl)) in
-    let eval_parameter exp reg l_temp = 
+    let eval_parameter exp reg l_temp =
       expr exp reg l_temp locals
     in
     List.fold_right2 eval_parameter e_list reg_list l_fun
@@ -91,7 +92,7 @@ let rec stmt (s:Ttree.stmt) destl retr exitl locals =
     let l_condition = condition e l_s destl locals in
     graph := Label.M.add l_decision (Label.M.find l_condition !graph) !graph;
     generate (Rtltree.Egoto l_decision)
-  | Ttree.Sblock (dv_list, s_list) -> 
+  | Ttree.Sblock (dv_list, s_list) ->
       let locals_block = Hashtbl.copy locals in
       let allocate_local_register dv =
         let reg = Register.fresh () in
