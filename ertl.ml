@@ -1,5 +1,12 @@
 open Ertltree
 
+let graph = ref Label.M.empty
+
+let generate i =
+  let l = Label.fresh () in
+  graph := Label.M.add l i !graph;
+  l
+
 let instr = function
   | Rtltree.Econst (n, r, l) ->
       Ertltree.Econst (n, r, l)
@@ -25,13 +32,19 @@ let instr = function
   | Rtltree.Egoto l ->
       Ertltree.Egoto (l)
 
+let rtl_to_ertl l i =
+  graph := Label.M.add l (instr i) !graph
+
 let deffun (df:Rtltree.deffun) =
+  graph := Label.M.add df.fun_exit Ertltree.Ereturn Label.M.empty;
+  Label.M.iter rtl_to_ertl df.fun_body;
   {
     fun_name    = df.fun_name;
     fun_formals = Register.S.cardinal df.fun_locals;
     fun_locals  = df.fun_locals;
     fun_entry   = df.fun_entry;
-    fun_body    = df.fun_body;
+    fun_body    = !graph;
   }
 
-let program (file:Rtltree.file) = {funs = List.map deffun file.funs}
+let program (file:Rtltree.file) = 
+  { funs = List.map deffun file.funs }
