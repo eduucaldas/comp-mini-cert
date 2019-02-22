@@ -18,8 +18,10 @@ let instr = function
       Ertltree.Emunop (op, r, l)
   | Rtltree.Embinop (op, r1, r2, l) ->
       begin match op with
-      (* TODO *)
-      | Mdiv -> Embinop (op, r1, r2, l)
+      | Mdiv ->
+        let l_back = generate (Embinop (Mmov, rax, r2, l)) in
+        let l_div = generate (Embinop (Mdiv, r1, rax, l_back)) in
+        Embinop (Mmov, rax, r2, l_div)
       | _ -> Embinop (op, r1, r2, l)
       end
   | Rtltree.Emubranch (b, r, l1, l2) ->
