@@ -2,7 +2,7 @@ open Ertltree
 
 let graph = ref Label.M.empty
 
-let generate i =
+let generate (i:Ertltree.instr) =
   let l = Label.fresh () in
   graph := Label.M.add l i !graph;
   l
@@ -19,9 +19,9 @@ let instr = function
   | Rtltree.Embinop (op, r1, r2, l) ->
       begin match op with
       | Mdiv ->
-        let l_back = generate (Embinop (Mmov, rax, r2, l)) in
-        let l_div = generate (Embinop (Mdiv, r1, rax, l_back)) in
-        Embinop (Mmov, rax, r2, l_div)
+        let l_back = generate (Embinop (Mmov, Register.rax, r2, l)) in
+        let l_div = generate (Embinop (Mdiv, r1, Register.rax, l_back)) in
+        Embinop (Mmov, r2, Register.rax, l_div)
       | _ -> Embinop (op, r1, r2, l)
       end
   | Rtltree.Emubranch (b, r, l1, l2) ->
@@ -34,8 +34,9 @@ let instr = function
   | Rtltree.Egoto l ->
       Ertltree.Egoto (l)
 
-let rtl_to_ertl l i =
-  graph := Label.M.add l (instr i) !graph
+let rtl_to_ertl (l:Label.t) (i:Rtltree.instr) =
+  let einstr = instr i in
+  graph := Label.M.add l einstr !graph
 
 let deffun (df:Rtltree.deffun) =
   graph := Label.M.add df.fun_exit Ertltree.Ereturn Label.M.empty;
@@ -48,5 +49,5 @@ let deffun (df:Rtltree.deffun) =
     fun_body    = !graph;
   }
 
-let program (file:Rtltree.file) = 
+let program (file:Rtltree.file) =
   { funs = List.map deffun file.funs }
