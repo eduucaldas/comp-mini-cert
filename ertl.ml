@@ -84,7 +84,7 @@ let deffun (df:Rtltree.deffun) =
         if i < 6 then
           Embinop (Mmov, List.nth Register.parameters i, r_h, l_next)
         else
-          Eget_param (-8 * (i - 6), r_h, l)
+          Eget_param (8 * ((List.length df.fun_formals) - i + 1), r_h, l_next)
       )
   in
   let l_args = recover_args 0 df.fun_formals df.fun_entry in
