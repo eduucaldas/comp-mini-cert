@@ -33,12 +33,10 @@ let instr = function
     let l_pop =
       if n_of_stack_params == 0 then l
       else
-        generate (Emunop (Maddi(Int32.of_int (8 * n_of_stack_params)), Register.rsp, l))
+        generate (Emunop (Maddi(Int32.of_int (-8 * n_of_stack_params)), Register.rsp, l))
     in
-
     let l_ret = generate (Embinop (Mmov, Register.result, r, l_pop)) in
     let ertl_call = Ecall (f, min (List.length r_list) 6, l_ret) in
-
     let rec pass_args i r_l ertl =
         match r_l with
         | [] -> ertl
@@ -63,16 +61,15 @@ let deffun (df:Rtltree.deffun) =
   let l_ret = generate (Ertltree.Ereturn) in
 
   (* delete frame *)
-  let r_callees = List.map (fun x -> Register.fresh ()) Register.callee_saved in
   let l_del_frame = generate (Ertltree.Edelete_frame (l_ret)) in
-  let remove_callee reg r_pseudo l =
-    generate (Ertltree.Embinop(Mmov, r_pseudo, reg, l))
-  in
-  let l_rem_callee = List.fold_right2 remove_callee Register.callee_saved r_callees l_del_frame in
+  let r_callees = List.map (fun x -> Register.fresh ()) Register.callee_saved in
+  let l_load_callee = List.fold_right2
+      (fun r_source r_dest l -> generate (Ertltree.Embinop(Mmov, r_source, r_dest, l)))
+      r_callees Register.callee_saved l_del_frame in
 
   (* return value into rax *)
   graph := Label.M.add df.fun_exit
-      (Ertltree.Embinop(Mmov, df.fun_result, Register.result, l_rem_callee)) !graph;
+      (Ertltree.Embinop(Mmov, df.fun_result, Register.result, l_load_callee)) !graph;
 
   (* body instructions *)
   Label.M.iter rtl_to_ertl df.fun_body;
@@ -91,13 +88,11 @@ let deffun (df:Rtltree.deffun) =
       )
   in
   let l_args = recover_args 0 df.fun_formals df.fun_entry in
-
   (* alloc_frame *)
-  let save_callee reg r_pseudo l =
-    generate (Ertltree.Embinop(Mmov, reg, r_pseudo, l))
-  in
-  let l_callee = List.fold_right2 save_callee Register.callee_saved r_callees l_args in
-  let l_entry = generate (Ertltree.Ealloc_frame (l_callee)) in
+  let l_store_callee = List.fold_right2
+      (fun r_source r_dest l -> generate (Ertltree.Embinop(Mmov, r_source, r_dest, l)))
+      Register.callee_saved r_callees l_args in
+  let l_entry = generate (Ertltree.Ealloc_frame (l_store_callee)) in
 
   {
     fun_name    = df.fun_name;
