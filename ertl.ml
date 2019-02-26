@@ -33,7 +33,7 @@ let instr = function
     let l_pop =
       if n_of_stack_params == 0 then l
       else
-        generate (Emunop (Maddi(Int32.of_int (-8 * n_of_stack_params)), Register.rsp, l))
+        generate (Emunop (Maddi(Int32.of_int (8 * n_of_stack_params)), Register.rsp, l))
     in
     let l_ret = generate (Embinop (Mmov, Register.result, r, l_pop)) in
     let ertl_call = Ecall (f, min (List.length r_list) 6, l_ret) in
