@@ -11,9 +11,7 @@ type live_info = {
   mutable outs: Register.set;    (* variables vivantes en sortie *)
 }
 
-let label_live = Hashtbl.create 255
-
-let add_live_info lab instr =
+let add_live_info label_live l instr =
   let succ = Ertltree.succ instr in
   let defs, uses = Ertltree.def_use instr in
   let info = {
@@ -26,16 +24,16 @@ let add_live_info lab instr =
     outs = Register.S.empty;
   }
   in
-  Hashtbl.add label_live lab info
+  Hashtbl.add label_live l info
 
-let set_pred_in_succs l_pred inf_pred =
+let set_pred_in_succs label_live l_pred inf_pred =
   let add_pred l_succ =
     let inf_succ = Hashtbl.find label_live l_succ in
     inf_succ.pred <- Label.S.add l_pred inf_succ.pred
   in
   List.iter add_pred inf_pred.succ
 
-let kildall () =
+let kildall label_live =
   let ws = ref Label.S.empty in
   Hashtbl.iter (fun l _ -> (ws := Label.S.add l !ws)) label_live;
   while not (Label.S.is_empty !ws) do
@@ -54,9 +52,10 @@ let kildall () =
   done
 
 let liveness g =
-  Label.M.iter add_live_info g;
-  Hashtbl.iter set_pred_in_succs label_live;
-  kildall ();
+  let label_live = Hashtbl.create 255 in
+  Label.M.iter (add_live_info label_live) g;
+  Hashtbl.iter (set_pred_in_succs label_live) label_live;
+  kildall label_live;
   label_live
 
 let print_set = Register.print_set
