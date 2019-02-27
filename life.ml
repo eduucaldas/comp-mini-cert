@@ -1,3 +1,6 @@
+open Format
+open Ertltree
+
 type live_info = {
           instr: Ertltree.instr;
           succ: Label.t list;    (* successeurs *)
@@ -59,5 +62,22 @@ let liveness g =
 let print_set = Register.print_set
 
 let print_live_info fmt li =
-  Format.fprintf fmt "d={%a}@ u={%a}@ i={%a}@ o={%a}"
+  Format.fprintf fmt "d={%a}@ u={%a}@ i={%a}@ o={%a}@\n"
     print_set li.defs print_set li.uses print_set li.ins print_set li.outs
+
+let print_graph_with_life fmt label_live =
+Ertltree.visit (fun l i -> fprintf fmt "%a: %a " Label.print l print_instr i; print_live_info fmt (Hashtbl.find label_live l))
+
+let print_deffun_with_liveness fmt f =
+  fprintf fmt "%s(%d)@\n" f.fun_name f.fun_formals;
+  fprintf fmt "  @[";
+  fprintf fmt "entry : %a@\n" Label.print f.fun_entry;
+  fprintf fmt "locals: @[%a@]@\n" Register.print_set f.fun_locals;
+  let label_live = liveness f.fun_body in
+  print_graph_with_life fmt label_live f.fun_body f.fun_entry;
+  fprintf fmt "@]@."
+
+
+let print_with_liveness fmt p =
+  fprintf fmt "=== ERTL + Liveness =================================================@\n";
+  List.iter (print_deffun_with_liveness fmt) p.funs

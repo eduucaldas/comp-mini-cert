@@ -10,6 +10,7 @@ let parse_only = ref false
 let type_only = ref false
 let interp_rtl = ref false
 let interp_ertl = ref false
+let liveness = ref false
 let debug = ref false
 
 let ifile = ref ""
@@ -25,6 +26,8 @@ let options =
      "  interprets RTL (and does not compile)";
    "--interp-ertl", Arg.Set interp_ertl,
      "  interprets ERTL (and does not compile)";
+   "--liveness", Arg.Set liveness,
+   "  shows livenness info of the ertl tree";
    "--debug", Arg.Set debug,
      "  debug mode";
    ]
@@ -59,6 +62,7 @@ let () =
     let p = Ertl.program p in
     if debug then Ertltree.print_file std_formatter p;
     if !interp_ertl then begin ignore (Ertlinterp.program p); exit 0 end;
+    if debug then Life.print_with_liveness std_formatter p;
     (* ... *)
   with
     | Lexer.Lexical_error c ->

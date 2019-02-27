@@ -11,3 +11,5 @@ type live_info = {
 val liveness: Ertltree.cfg ->  (Label.t,  live_info) Hashtbl.t
 
 val print_live_info: Format.formatter -> live_info -> unit
+
+val print_with_liveness: Format.formatter -> Ertltree.file -> unit
