@@ -68,3 +68,5 @@ val print_graph: Format.formatter -> cfg -> label -> unit
 val print_deffun: Format.formatter -> deffun -> unit
 
 val print_file: Format.formatter -> file -> unit
+
+val print_w_header: (Format.formatter -> cfg -> label -> unit) -> Format.formatter -> deffun -> unit

@@ -163,13 +163,16 @@ let visit f g entry =
 let print_graph fmt =
   visit (fun l i -> fprintf fmt "%a: %a@\n" Label.print l print_instr i)
 
-let print_deffun fmt f =
+let print_w_header p_g fmt f =
   fprintf fmt "%s(%d)@\n" f.fun_name f.fun_formals;
   fprintf fmt "  @[";
   fprintf fmt "entry : %a@\n" Label.print f.fun_entry;
   fprintf fmt "locals: @[%a@]@\n" Register.print_set f.fun_locals;
-  print_graph fmt f.fun_body f.fun_entry;
+  p_g fmt f.fun_body f.fun_entry;
   fprintf fmt "@]@."
+
+let print_deffun =
+  print_w_header print_graph
 
 let print_file fmt p =
   fprintf fmt "=== ERTL =================================================@\n";
