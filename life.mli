@@ -8,6 +8,6 @@ type live_info = {
   mutable outs: Register.set;    (* variables vivantes en sortie *)
 }
 
-val liveness: Ertltree.cfg -> live_info Label.map
+val liveness: Ertltree.cfg ->  (Label.t,  live_info) Hashtbl.t
 
 val print_live_info: Format.formatter -> live_info -> unit

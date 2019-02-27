@@ -25,22 +25,22 @@ let add_live_info lab instr =
   in
   Hashtbl.add label_live lab info
 
-let set_pred_in_succs l_pred inf_pred = 
+let set_pred_in_succs l_pred inf_pred =
   let add_pred l_succ =
     let inf_succ = Hashtbl.find label_live l_succ in
     inf_succ.pred <- Label.S.add l_pred inf_succ.pred
   in
   List.iter add_pred inf_pred.succ
 
-let kildall = 
+let kildall () =
   let ws = ref Label.S.empty in
-  ws := Hashtbl.fold (fun l _ acc -> Label.S.add l acc) label_live !ws;
+  Hashtbl.iter (fun l _ -> (ws := Label.S.add l !ws)) label_live;
   while not (Label.S.is_empty !ws) do
     let l = Label.S.choose !ws in
     ws := Label.S.remove l !ws;
     let inf = Hashtbl.find label_live l in
     let old_in = inf.ins in
-    let get_in_from_label l = 
+    let get_in_from_label l =
       (Hashtbl.find label_live l).ins
     in
     inf.outs <- List.fold_left (fun acc l -> Register.S.union (get_in_from_label l) acc)
@@ -49,11 +49,11 @@ let kildall =
     if not (Register.S.equal inf.ins old_in) then
       ws := Label.S.fold (fun l acc -> Label.S.add l acc) inf.pred !ws
   done
-        
+
 let liveness g =
   Label.M.iter add_live_info g;
   Hashtbl.iter set_pred_in_succs label_live;
-  kildall;
+  kildall ();
   label_live
 
 let print_set = Register.print_set
