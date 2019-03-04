@@ -27,7 +27,9 @@ let options =
    "--interp-ertl", Arg.Set interp_ertl,
      "  interprets ERTL (and does not compile)";
    "--liveness", Arg.Set liveness,
-   "  shows livenness info of the ertl tree";
+     "  shows livenness info of the ertl tree";
+   "--interference", Arg.Set liveness,
+     "  shows interference graph";
    "--debug", Arg.Set debug,
      "  debug mode";
    ]
@@ -63,6 +65,7 @@ let () =
     if debug then Ertltree.print_file std_formatter p;
     if !interp_ertl then begin ignore (Ertlinterp.program p); exit 0 end;
     if debug then Life.print_with_liveness std_formatter p;
+    if debug then Interference.print_file std_formatter p;
     (* ... *)
   with
     | Lexer.Lexical_error c ->
