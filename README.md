@@ -28,6 +28,9 @@ $ cd tests
 $ ./run -i "../mini-c --interp-ertl"
 ```
 
+
 *Developed by:*
+
 *[Eduardo Caldas](https://github.com/eduucaldas)*
+
 *[Gabriel Oliveira](https://github.com/gabrieloliveiragom)*
