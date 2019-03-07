@@ -42,11 +42,11 @@ let instr = function
         | [] -> ertl
         | r_h::r_t ->
           let next_ertl = (pass_args (i + 1) r_t ertl) in
-          let next_lab = generate next_ertl in
+          let l_next = generate next_ertl in
             if i < 6 then
-              Embinop (Mmov, r_h, List.nth Register.parameters i, next_lab)
+              Embinop (Mmov, r_h, List.nth Register.parameters i, l_next)
             else
-              Epush_param (r_h, next_lab)
+              Epush_param (r_h, l_next)
       in
       pass_args 0 r_list ertl_call
   | Rtltree.Egoto l ->
