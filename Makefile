@@ -1,13 +1,15 @@
+OCB_FLAGS = -I src -I lib
+OCB = ocamlbuild $(OCB_FLAGS)
 
 test: main.native mini-c
 	./mini-c --debug test.c
 
-main.native: *.ml*
-	ocamlbuild $@
+main.native: ./src/*.ml*
+	$(OCB) $@
 
 mini-c:
 	ln -s main.native $@
 
 clean:
-	ocamlbuild -clean
+	$(OCB) -clean
 	rm mini-c
