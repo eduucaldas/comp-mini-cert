@@ -12,7 +12,7 @@ let make live_info =
       graph := Register.M.add a ({prefs = Register.S.empty; intfs = Register.S.empty}) !graph;
     Register.M.find a !graph
   in
-  let add_pref label (live: Life.live_info) =
+  let add_pref _ (live: Life.live_info) =
     match live.instr with
     | Ertltree.Embinop (Mmov, x, y, _) when x != y ->
       let arcs_x = find_arcs x in
@@ -22,7 +22,7 @@ let make live_info =
     | _ -> ()
   in
   Hashtbl.iter add_pref live_info;
-  let add_label label (live: Life.live_info) = 
+  let add_label _ (live: Life.live_info) = 
     let add_def r_def = 
       let add_intf r_alive =
         match live.instr with

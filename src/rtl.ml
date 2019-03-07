@@ -74,12 +74,12 @@ and expr (e:Ttree.expr) destr destl =
     let l_access = generate (Rtltree.Eload (r_tmp, f.field_pos, destr, destl)) in
     expr e r_tmp l_access
   | Ttree.Ecall (id, e_list) ->
-    let reg_list = List.rev_map (fun x -> Register.fresh ()) e_list in
-    let l_fun = generate (Rtltree.Ecall (destr, id, reg_list, destl)) in
+    let r_list = List.rev_map (fun x -> Register.fresh ()) e_list in
+    let l_fun = generate (Rtltree.Ecall (destr, id, r_list, destl)) in
     let eval_parameter exp reg l_temp =
       expr exp reg l_temp
     in
-    List.fold_right2 eval_parameter e_list reg_list l_fun
+    List.fold_right2 eval_parameter e_list r_list l_fun
   | Ttree.Esizeof s -> generate (Rtltree.Econst(Int32.of_int s.str_size, destr, destl))
 
 let rec stmt (s:Ttree.stmt) destl retr exitl =
@@ -98,9 +98,9 @@ let rec stmt (s:Ttree.stmt) destl retr exitl =
     generate (Rtltree.Egoto l_decision)
   | Ttree.Sblock (dv_list, s_list) ->
       let allocate_local_register dv =
-        let reg = Register.fresh () in
-        Hashtbl.add local_vars (snd dv) reg;
-        locals := reg :: !locals
+        let r = Register.fresh () in
+        Hashtbl.add local_vars (snd dv) r;
+        locals := r :: !locals
       in
       List.iter allocate_local_register dv_list;
       let rec stmt_list = function
@@ -122,9 +122,9 @@ let deffun (df:Ttree.decl_fun) =
   let exitl = Label.fresh () in
   let retr = Register.fresh () in
   let allocate_register dv =
-    let reg = Register.fresh () in
-    Hashtbl.add local_vars (snd dv) reg;
-    reg
+    let r = Register.fresh () in
+    Hashtbl.add local_vars (snd dv) r;
+    r
   in
   let formals = List.map allocate_register df.fun_formals in
   let entry = stmt (Ttree.Sblock(df.fun_body)) exitl retr exitl in
