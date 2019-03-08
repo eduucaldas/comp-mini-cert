@@ -25,10 +25,10 @@ let make l_to_li =
      belonging to li.defs X li.outs, as described in the 8th course
   *)
   let add_pref r_1 r_2 =
-      let arcs_1 = find_arcs graph r_1 in
-      let arcs_2 = find_arcs graph r_2 in
-      arcs_1.prefs <- Register.S.add r_2 arcs_1.prefs;
-      arcs_2.prefs <- Register.S.add r_1 arcs_2.prefs
+    let arcs_1 = find_arcs graph r_1 in
+    let arcs_2 = find_arcs graph r_2 in
+    arcs_1.prefs <- Register.S.add r_2 arcs_1.prefs;
+    arcs_2.prefs <- Register.S.add r_1 arcs_2.prefs
   in
   let add_intf r_1 r_2 =
     let arcs_1 = find_arcs graph r_1 in
@@ -55,28 +55,27 @@ let make l_to_li =
   Register.M.iter (fun _ a -> a.prefs <- Register.S.diff a.prefs a.intfs) !graph;
   !graph
 
-let any_color r c_possible = 
+let any_color r c_possible =
   not (Register.S.is_empty c_possible)
 
 let known_pref_color ig colors r c_possible =
   let r_prefs = (Register.M.find r ig).prefs in
-  let r_prefs_colored = Register.S.filter (fun r -> Register.M.mem r colors) r_prefs in 
+  let r_prefs_colored = Register.S.filter (fun r -> Register.M.mem r colors) r_prefs in
   (* let c_prefered = Register.S.map (fun r -> Register.M.find r colors) r_prefs_colored in *)
   not (Register.S.is_empty r_prefs_colored)
 
-let unique_color r c_possible = 
+let unique_color r c_possible =
   Register.S.cardinal c_possible == 1
 
-let unique_pref_color ig r c_possible = 
+let unique_pref_color ig r c_possible =
   Register.S.cardinal c_possible == 1 && Register.S.mem (Register.S.choose c_possible) (Register.M.find r ig).prefs
 
-let filter f todo = 
+let filter f todo =
   Register.M.filter f todo
 
-let pick map = 
+let pick map =
   let r, c_possible = Register.M.choose map in
-  Some (r, Register.S.choose c_possible)
-
+  Some (r, Ltltree.Reg(Register.S.choose c_possible))
 
 let choose todo ig colors =
   let filtered_unique_pref = filter (unique_pref_color ig) todo in
@@ -108,25 +107,27 @@ let color ig =
   let num_spilled = ref 0 in
   let rec color_one_pseudo () =
     if Register.M.is_empty !todo then ()
-    else 
-      (match choose !todo ig !colors with
-      | None -> ()
-        (*let r, _ = Register.M.choose !todo in
+    else (
+      match choose !todo ig !colors with
+      | None ->
+        let r, _ = Register.M.choose !todo in
         todo := Register.M.remove r !todo;
         colors := Register.M.add r (Ltltree.Spilled(!num_spilled)) !colors;
-        num_spilled <- num_spilled + 8*)
-      | Some (r, c) ->
+        num_spilled := !num_spilled + 8
+      | Some (r, (Reg(c) as color)) ->
         todo := Register.M.remove r !todo;
-        let update_intf r_intf = 
+        let update_intf r_intf =
           let remove_color = function
-          | None -> None 
-          | Some c_possible -> Some (Register.S.remove c c_possible)
+            | None -> None
+            | Some c_possible -> Some (Register.S.remove c c_possible)
           in
           todo := Register.M.update r_intf remove_color !todo
         in
         Register.S.iter update_intf (Register.M.find r ig).intfs;
-        colors := Register.M.add r c !colors;
-        color_one_pseudo ())
+        colors := Register.M.add r color !colors;
+        color_one_pseudo ()
+      | _ -> assert false
+    )
   in
   color_one_pseudo ();
   !colors
@@ -139,3 +140,12 @@ let print ig =
 let print_file fmt (p: Ertltree.file) =
   Format.fprintf fmt "=== Interference Graph =================================================@\n";
   List.iter (fun (f: Ertltree.deffun) -> print(make (Life.liveness f.fun_body))) p.funs
+
+open Format
+let print_color fmt = function
+  | Ltltree.Reg hr    -> fprintf fmt "%a" Register.print hr
+  | Ltltree.Spilled n -> fprintf fmt "stack %d" n
+
+let print cm =
+  Register.M.iter
+    (fun r cr -> printf "%a -> %a@\n" Register.print r print_color cr) cm
