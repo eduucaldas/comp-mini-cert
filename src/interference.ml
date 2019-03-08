@@ -15,42 +15,44 @@ let find_arcs g r =
 
 let make l_to_li =
   let graph = ref Register.M.empty in
-
-  let add_pref _ (li: Life.live_info) =
-    match li.instr with
-    | Ertltree.Embinop (Mmov, r_1, r_2, _) when r_1 != r_2 ->
+  (*
+     For every label in l_to_li we pick the live_info
+     and for every live_info we add the edges (d, o)
+     belonging to li.defs X li.outs, as described in the 8th course
+  *)
+  let add_pref r_1 r_2 =
       let arcs_1 = find_arcs graph r_1 in
       let arcs_2 = find_arcs graph r_2 in
       arcs_1.prefs <- Register.S.add r_2 arcs_1.prefs;
       arcs_2.prefs <- Register.S.add r_1 arcs_2.prefs
-    | _ -> ()
   in
-  Hashtbl.iter add_pref l_to_li;
+  let add_intf r_1 r_2 =
+    let arcs_1 = find_arcs graph r_1 in
+    let arcs_2 = find_arcs graph r_2 in
+    arcs_2.intfs <- Register.S.add r_1 arcs_2.intfs;
+    arcs_1.intfs <- Register.S.add r_2 arcs_1.intfs;
+  in
+  let add_intfs r_dests r_source =
+    Register.S.iter (add_intf r_source) (Register.S.remove r_source r_dests)
+  in
+  let add_arcs_from_li _ (li: Life.live_info) =
+    let r_outs = (
+      match li.instr with
+      | Ertltree.Embinop (Mmov, r_1, r_2, _) ->
+        if r_1 != r_2 then add_pref r_1 r_2;
+        Register.S.remove r_2 li.outs
+      | _ -> li.outs
+    ) in
+    Register.S.iter (add_intfs r_outs) li.defs
+  in
+  Hashtbl.iter add_arcs_from_li l_to_li;
 
-  let add_label _ (li: Life.live_info) =
-    let add_def r_def =
-      let add_intf r_alive =
-        match li.instr with
-        | Ertltree.Embinop (Mmov, r_1, r_2, _) when r_1 == r_alive && r_2 == r_def -> ()
-        | _ ->
-          if r_alive != r_def then
-            let arcs_def = find_arcs graph r_def in
-            let arcs_alive = find_arcs graph r_alive in
-            arcs_alive.intfs <- Register.S.add r_def arcs_alive.intfs;
-            arcs_def.intfs <- Register.S.add r_alive arcs_def.intfs;
-            if Register.S.mem r_alive arcs_def.prefs then
-              arcs_alive.prefs <- Register.S.remove r_def arcs_alive.prefs;
-              arcs_def.prefs <- Register.S.remove r_alive arcs_def.prefs
-      in
-      Register.S.iter add_intf li.outs
-    in
-    Register.S.iter add_def li.defs
-  in
-  Hashtbl.iter add_label l_to_li;
+  (*clean edges both in interference and preference*)
+  Register.M.iter (fun _ a -> a.prefs <- Register.S.diff a.prefs a.intfs) !graph;
   !graph
 
 let print ig =
-    Register.M.iter (fun r arcs ->
+  Register.M.iter (fun r arcs ->
       Format.printf "%s: prefs=@[%a@] intfs=@[%a@]@." (r :> string)
         Register.print_set arcs.prefs Register.print_set arcs.intfs) ig
 
