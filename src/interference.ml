@@ -1,3 +1,5 @@
+open Format
+
 type arcs = {
   mutable prefs: Register.set;
   mutable intfs: Register.set
@@ -71,7 +73,7 @@ let pick_r_w_c criteria (r_to_c_possible: Register.S.t Register.map) =
   | None -> None
   | Some (r, r_c) -> Some (r, Ltltree.Reg (Register.S.choose r_c))
 
-let is_none a =
+let is_some a =
   match a with
   | None -> true
   | _ -> false
@@ -79,14 +81,14 @@ let is_none a =
 let pick_r_w_c_pref_known (colors: coloring) ig (r_to_c_possible: Register.S.t Register.map) =
   let pick_c_pref_known_opt r _ =
     let r_prefs = (Register.M.find r ig).prefs in
-    let r_prefs_to_known_colors = Register.M.filter (fun r c -> Register.S.mem r r_prefs) colors in
+    let r_prefs_to_known_colors = Register.M.filter (fun r _ -> Register.S.mem r r_prefs) colors in
     match (Register.M.choose_opt r_prefs_to_known_colors) with
     | None -> None
     | Some (_, c) -> Some c
   in
   let r_w_c_opt = Register.M.choose_opt (
     Register.M.filter
-      (fun _ c -> is_none c)
+      (fun _ c -> (is_some c))
       (Register.M.mapi
          pick_c_pref_known_opt
          r_to_c_possible
@@ -99,30 +101,31 @@ let pick_r_w_c_pref_known (colors: coloring) ig (r_to_c_possible: Register.S.t R
 
 let choose todo ig (colors: coloring) =
   let r_w_c_unique_pref = pick_r_w_c (unique_pref_color ig) todo in
-  if not (is_none r_w_c_unique_pref) then r_w_c_unique_pref
+  if (is_some r_w_c_unique_pref) then r_w_c_unique_pref
   else
     let r_w_c_unique = pick_r_w_c unique_color todo in
-    if not (is_none r_w_c_unique) then r_w_c_unique_pref
+    if (is_some r_w_c_unique) then r_w_c_unique_pref
     else
       let r_w_c_pref_known = pick_r_w_c_pref_known colors ig todo in
-      if not (is_none r_w_c_pref_known) then r_w_c_pref_known
+      if (is_some r_w_c_pref_known) then r_w_c_pref_known
       else
         let r_w_c_any = pick_r_w_c any_color todo in
-        if not (is_none r_w_c_any) then r_w_c_any
+        if (is_some r_w_c_any) then r_w_c_any
         else
           None
 
 let color ig =
   let todo: Register.S.t Register.map ref = ref Register.M.empty in
-  Register.M.iter (fun r a -> todo := Register.M.add r (Register.S.diff Register.allocatable a.intfs) !todo) ig;
+  Register.M.iter (fun r a -> if Register.is_pseudo r then todo := Register.M.add r (Register.S.diff Register.allocatable a.intfs) !todo) ig;
   let colors: coloring ref = ref Register.M.empty in
+  Register.S.iter (fun r -> if (Register.M.mem r ig) then colors := Register.M.add r (Ltltree.Reg(r)) !colors) Register.allocatable;
   let num_spilled = ref 0 in
   while not (Register.M.is_empty !todo) do
     match choose !todo ig !colors with
     | None ->
       let r, _ = Register.M.choose !todo in
       todo := Register.M.remove r !todo;
-      colors := Register.M.add r (Ltltree.Spilled(!num_spilled)) !colors;
+      colors := Register.M.add r (Ltltree.Spilled(!num_spilled)) !colors; (* Is this good? *)
       num_spilled := !num_spilled + 8
     | Some (r, (Reg(r_c) as c)) ->
       todo := Register.M.remove r !todo;
@@ -137,6 +140,7 @@ let color ig =
       colors := Register.M.add r c !colors;
     | _ -> assert false
   done;
+  Register.S.iter (fun r -> if (Register.M.mem r ig) then colors := Register.M.remove r !colors) Register.allocatable;
   (!colors, !num_spilled)
 
 let print ig =
@@ -144,15 +148,16 @@ let print ig =
       Format.printf "%s: prefs=@[%a@] intfs=@[%a@]@." (r :> string)
         Register.print_set arcs.prefs Register.print_set arcs.intfs) ig
 
-let print_file fmt (p: Ertltree.file) =
-  Format.fprintf fmt "=== Interference Graph =================================================@\n";
-  List.iter (fun (f: Ertltree.deffun) -> print(make (Life.liveness f.fun_body))) p.funs
-
-open Format
 let print_color fmt = function
   | Ltltree.Reg hr    -> fprintf fmt "%a" Register.print hr
   | Ltltree.Spilled n -> fprintf fmt "stack %d" n
 
-let print cm =
+let print_coloring cm =
   Register.M.iter
     (fun r cr -> printf "%a -> %a@\n" Register.print r print_color cr) cm
+
+let print_file fmt (p: Ertltree.file) =
+  Format.fprintf fmt "=== Interference Graph =================================================@\n";
+  List.iter (fun (f: Ertltree.deffun) -> print(make (Life.liveness f.fun_body))) p.funs;
+  Format.fprintf fmt "=== Coloring =================================================@\n";
+  List.iter (fun (f: Ertltree.deffun) -> print_coloring(fst (color (make (Life.liveness f.fun_body))))) p.funs;
