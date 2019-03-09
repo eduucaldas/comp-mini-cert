@@ -58,79 +58,86 @@ let make l_to_li =
 let any_color r c_possible =
   not (Register.S.is_empty c_possible)
 
-let known_pref_color ig colors r c_possible =
-  let r_prefs = (Register.M.find r ig).prefs in
-  let r_prefs_colored = Register.S.filter (fun r -> Register.M.mem r colors) r_prefs in
-  (* let c_prefered = Register.S.map (fun r -> Register.M.find r colors) r_prefs_colored in *)
-  not (Register.S.is_empty r_prefs_colored)
-
 let unique_color r c_possible =
   Register.S.cardinal c_possible == 1
 
 let unique_pref_color ig r c_possible =
   Register.S.cardinal c_possible == 1 && Register.S.mem (Register.S.choose c_possible) (Register.M.find r ig).prefs
 
-let filter f todo =
-  Register.M.filter f todo
+let pick_r_w_c criteria (r_to_c_possible: Register.S.t Register.map) =
+  match Register.M.choose_opt (
+    Register.M.filter criteria r_to_c_possible
+  ) with
+  | None -> None
+  | Some (r, r_c) -> Some (r, Ltltree.Reg (Register.S.choose r_c))
 
-let pick map =
-  let r, c_possible = Register.M.choose map in
-  Some (r, Ltltree.Reg(Register.S.choose c_possible))
+let is_none a =
+  match a with
+  | None -> true
+  | _ -> false
 
-let choose todo ig colors =
-  let filtered_unique_pref = filter (unique_pref_color ig) todo in
-  if not (Register.M.is_empty filtered_unique_pref) then
-    pick filtered_unique_pref
+let pick_r_w_c_pref_known (colors: coloring) ig (r_to_c_possible: Register.S.t Register.map) =
+  let pick_c_pref_known_opt r _ =
+    let r_prefs = (Register.M.find r ig).prefs in
+    let r_prefs_to_known_colors = Register.M.filter (fun r c -> Register.S.mem r r_prefs) colors in
+    match (Register.M.choose_opt r_prefs_to_known_colors) with
+    | None -> None
+    | Some (_, c) -> Some c
+  in
+  let r_w_c_opt = Register.M.choose_opt (
+    Register.M.filter
+      (fun _ c -> is_none c)
+      (Register.M.mapi
+         pick_c_pref_known_opt
+         r_to_c_possible
+      )
+  ) in
+  match r_w_c_opt with
+  | None -> None
+  | Some (r, Some c) -> Some (r, c)
+  | Some (r, None) -> assert false
+
+let choose todo ig (colors: coloring) =
+  let r_w_c_unique_pref = pick_r_w_c (unique_pref_color ig) todo in
+  if not (is_none r_w_c_unique_pref) then r_w_c_unique_pref
   else
-    let filtered_unique = filter unique_color todo in
-    if not (Register.M.is_empty filtered_unique) then
-      pick filtered_unique
+    let r_w_c_unique = pick_r_w_c unique_color todo in
+    if not (is_none r_w_c_unique) then r_w_c_unique_pref
     else
-      let filtered_known_pref = filter (known_pref_color ig colors) todo in
-      if not (Register.M.is_empty filtered_known_pref) then
-        let r, _ = Register.M.choose filtered_known_pref in
-        let r_prefs = (Register.M.find r ig).prefs in
-        let r_prefs_colored = Register.S.filter (fun r -> Register.M.mem r colors) r_prefs in
-        let r_pref_chosen = Register.S.choose r_prefs_colored in
-        Some (r, Register.M.find r_pref_chosen colors)
+      let r_w_c_pref_known = pick_r_w_c_pref_known colors ig todo in
+      if not (is_none r_w_c_pref_known) then r_w_c_pref_known
       else
-        let filtered_any = filter any_color todo in
-        if not (Register.M.is_empty filtered_any) then
-          pick filtered_any
+        let r_w_c_any = pick_r_w_c any_color todo in
+        if not (is_none r_w_c_any) then r_w_c_any
         else
           None
 
 let color ig =
-  let todo = ref Register.M.empty in
+  let todo: Register.S.t Register.map ref = ref Register.M.empty in
   Register.M.iter (fun r a -> todo := Register.M.add r (Register.S.diff Register.allocatable a.intfs) !todo) ig;
-  let colors = ref Register.M.empty in
+  let colors: coloring ref = ref Register.M.empty in
   let num_spilled = ref 0 in
-  let rec color_one_pseudo () =
-    if Register.M.is_empty !todo then ()
-    else (
-      match choose !todo ig !colors with
-      | None ->
-        let r, _ = Register.M.choose !todo in
-        todo := Register.M.remove r !todo;
-        colors := Register.M.add r (Ltltree.Spilled(!num_spilled)) !colors;
-        num_spilled := !num_spilled + 8
-      | Some (r, (Reg(c) as color)) ->
-        todo := Register.M.remove r !todo;
-        let update_intf r_intf =
-          let remove_color = function
-            | None -> None
-            | Some c_possible -> Some (Register.S.remove c c_possible)
-          in
-          todo := Register.M.update r_intf remove_color !todo
+  while not (Register.M.is_empty !todo) do
+    match choose !todo ig !colors with
+    | None ->
+      let r, _ = Register.M.choose !todo in
+      todo := Register.M.remove r !todo;
+      colors := Register.M.add r (Ltltree.Spilled(!num_spilled)) !colors;
+      num_spilled := !num_spilled + 8
+    | Some (r, (Reg(r_c) as c)) ->
+      todo := Register.M.remove r !todo;
+      let update_intf r_intf =
+        let remove_color = function
+          | None -> None
+          | Some c_possible -> Some (Register.S.remove r_c c_possible)
         in
-        Register.S.iter update_intf (Register.M.find r ig).intfs;
-        colors := Register.M.add r color !colors;
-        color_one_pseudo ()
-      | _ -> assert false
-    )
-  in
-  color_one_pseudo ();
-  !colors
+        todo := Register.M.update r_intf remove_color !todo
+      in
+      Register.S.iter update_intf (Register.M.find r ig).intfs;
+      colors := Register.M.add r c !colors;
+    | _ -> assert false
+  done;
+  (!colors, !num_spilled)
 
 let print ig =
   Register.M.iter (fun r arcs ->
