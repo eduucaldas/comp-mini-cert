@@ -75,8 +75,8 @@ let pick_r_w_c criteria (r_to_c_possible: Register.S.t Register.map) =
 
 let is_some a =
   match a with
-  | None -> true
-  | _ -> false
+  | None -> false
+  | _ -> true
 
 let pick_r_w_c_pref_known (colors: coloring) ig (r_to_c_possible: Register.S.t Register.map) =
   let pick_c_pref_known_opt r _ =
