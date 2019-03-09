@@ -1,3 +1,5 @@
+open Format
+
 type arcs = {
   mutable prefs: Register.set;
   mutable intfs: Register.set
@@ -102,8 +104,9 @@ let choose todo ig colors =
 
 let color ig =
   let todo = ref Register.M.empty in
-  Register.M.iter (fun r a -> todo := Register.M.add r (Register.S.diff Register.allocatable a.intfs) !todo) ig;
+  Register.M.iter (fun r a -> if Register.is_pseudo r then todo := Register.M.add r (Register.S.diff Register.allocatable a.intfs) !todo) ig;
   let colors = ref Register.M.empty in
+  Register.S.iter (fun r -> if (Register.M.mem r ig) then colors := Register.M.add r (Ltltree.Reg(r)) !colors) Register.allocatable;
   let num_spilled = ref 0 in
   let rec color_one_pseudo () =
     if Register.M.is_empty !todo then ()
@@ -130,6 +133,7 @@ let color ig =
     )
   in
   color_one_pseudo ();
+  Register.S.iter (fun r -> if (Register.M.mem r ig) then colors := Register.M.remove r !colors) Register.allocatable;
   !colors
 
 let print ig =
@@ -137,15 +141,16 @@ let print ig =
       Format.printf "%s: prefs=@[%a@] intfs=@[%a@]@." (r :> string)
         Register.print_set arcs.prefs Register.print_set arcs.intfs) ig
 
-let print_file fmt (p: Ertltree.file) =
-  Format.fprintf fmt "=== Interference Graph =================================================@\n";
-  List.iter (fun (f: Ertltree.deffun) -> print(make (Life.liveness f.fun_body))) p.funs
-
-open Format
 let print_color fmt = function
   | Ltltree.Reg hr    -> fprintf fmt "%a" Register.print hr
   | Ltltree.Spilled n -> fprintf fmt "stack %d" n
 
-let print cm =
+let print_coloring cm =
   Register.M.iter
     (fun r cr -> printf "%a -> %a@\n" Register.print r print_color cr) cm
+
+let print_file fmt (p: Ertltree.file) =
+  Format.fprintf fmt "=== Interference Graph =================================================@\n";
+  List.iter (fun (f: Ertltree.deffun) -> print(make (Life.liveness f.fun_body))) p.funs;
+  Format.fprintf fmt "=== Coloring =================================================@\n";
+  List.iter (fun (f: Ertltree.deffun) -> print_coloring(color (make (Life.liveness f.fun_body)))) p.funs;
