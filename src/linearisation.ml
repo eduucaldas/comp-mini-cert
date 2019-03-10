@@ -18,8 +18,12 @@ let operand = function
   | Ltltree.Reg r -> reg (register64 r)
   | Ltltree.Spilled fs -> ind ~ofs:fs rbp
 
+let operandB = function
+  | Ltltree.Reg r -> reg (register8 (register64 r))
+  | _ -> assert false
+
 let bset_to_64 op r1 r2 =
-  let rb2 = reg (register8 (register64 r2)) in
+  let rb2 = operandB r2 in
   match op with
   | Ops.Msete -> sete rb2
   | Ops.Msetne -> setne rb2
@@ -43,25 +47,20 @@ let binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) =
   match op with
   | Ops.Mmov | Ops.Madd | Ops.Msub | Ops.Mmul | Ops.Mdiv -> barith_to_64 op r1 r2
   | Ops.Msete | Ops.Msetne | Ops.Msetl | Ops.Msetle | Ops.Msetg | Ops.Msetge ->
-    assert false
-    (*
     emit_wl (cmpq (operand r1) (operand r2));
     bset_to_64 op r1 r2
-       *)
 
 let unop_to_64 (op:Ops.munop) (r:Ltltree.operand) =
   let r_op = operand r in
   match op with
   | Ops.Maddi i ->
     addq (imm32 i) r_op
-  | Ops.Msetei i -> assert false
-    (* emit_wl (cmpq i r_op);
-    sete r64 *)
-  | Ops.Msetnei i -> assert false
-  (*
-    emit_wl (cmpq i r64);
-    setne r64
-                       *)
+  | Ops.Msetei i ->
+    emit_wl (cmpq (imm32 i) r_op);
+    sete (operandB r)
+  | Ops.Msetnei i ->
+    emit_wl (cmpq (imm32 i) r_op);
+    setne (operandB r)
 
 let ubranch_to_64 br r =
   let n, brx = (
