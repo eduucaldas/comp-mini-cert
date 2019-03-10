@@ -33,7 +33,9 @@ let instr colored frame_size = function
   | Ertltree.Eget_param (off, r, l) -> (
       match lookup colored r with
       | Reg r_p -> Eload (r_p, off, Register.rbp, l)
-      | _ -> assert false
+      | Spilled fs ->
+        let l_load = generate (Estore(Register.tmp1, Register.rbp, fs, l)) in
+        Eload(Register.rbp, off, Register.tmp1, l_load)
     )
   | Ertltree.Embinop (op ,r1, r2, l) -> (
     let r_c1, r_c2 = lookup colored r1, lookup colored r2 in
