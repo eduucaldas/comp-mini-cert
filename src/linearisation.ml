@@ -63,7 +63,6 @@ let unop_to_64 (op:Ops.munop) (r:Ltltree.operand) =
     setne r64
                        *)
 
-
 let ubranch_to_64 = function
   | Ops.Mjz -> jz
   | Ops.Mjnz -> jnz
@@ -120,8 +119,9 @@ and instr g l = function
     assert false
   | Ltltree.Embbranch (n, r1, r2, lt, lf) ->
     assert false
-  | Ltltree.Ecall (id, label) ->
-    assert false
+  | Ltltree.Ecall (id, l1) ->
+    emit l (call id);
+    lin g l1
 
 let deffun text (df: Ltltree.deffun) =
   code := [];
