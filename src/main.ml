@@ -1,4 +1,4 @@
-
+(* -no-pie *)
 (* Fichier principal du compilateur mini-c *)
 
 open Format
