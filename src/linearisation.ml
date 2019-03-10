@@ -15,31 +15,64 @@ let emit_wl i = code := Code i :: !code
 let need_label l = Hashtbl.add labels l ()
 
 let operand = function
-  | Reg r -> register64 r
-  | Spilled fs -> assert false
+  | Ltltree.Reg r -> reg (register64 r)
+  | Ltltree.Spilled fs -> ind ~ofs:fs rbp
 
-let binop_to_64 = function
-  | Mmov -> movq
-  | Madd -> addq
-  | Msub -> subq
-  | Mmul -> imulq
-  | Mdiv -> idivq
-  | Msete -> sete
-  | Msetne -> setne
-  | Msetl -> setl
-  | Msetle -> setle
-  | Msetg -> setg
-  | Msetge -> setge
+let bset_to_64 op r1 r2 =
+  let rb2 = reg (register8 (register64 r2)) in
+  match op with
+  | Ops.Msete -> sete rb2
+  | Ops.Msetne -> setne rb2
+  | Ops.Msetl -> setl rb2
+  | Ops.Msetle -> setle rb2
+  | Ops.Msetg -> setg rb2
+  | Ops.Msetge -> setge rb2
+  | _ -> assert false
+
+let barith_to_64 op r1 r2 =
+  let rb1 = operand r1 in
+  match op with
+  | Ops.Mmov ->  movq rb1 (operand r2)
+  | Ops.Madd ->  addq rb1 (operand r2)
+  | Ops.Msub ->  subq rb1 (operand r2)
+  | Ops.Mmul -> imulq rb1 (operand r2)
+  | Ops.Mdiv when (operand r2) = (reg rax) -> idivq rb1
+  | _ -> assert false
+
+let binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) =
+  match op with
+  | Ops.Mmov | Ops.Madd | Ops.Msub | Ops.Mmul | Ops.Mdiv -> barith_to_64 op r1 r2
+  | Ops.Msete | Ops.Msetne | Ops.Msetl | Ops.Msetle | Ops.Msetg | Ops.Msetge ->
+    assert false
+    (*
+    emit_wl (cmpq (operand r1) (operand r2));
+    bset_to_64 op r1 r2
+       *)
+
+let unop_to_64 (op:Ops.munop) (r:Ltltree.operand) =
+  let r_op = operand r in
+  match op with
+  | Ops.Maddi i ->
+    addq (imm32 i) r_op
+  | Ops.Msetei i -> assert false
+    (* emit_wl (cmpq i r_op);
+    sete r64 *)
+  | Ops.Msetnei i -> assert false
+  (*
+    emit_wl (cmpq i r64);
+    setne r64
+                       *)
+
 
 let ubranch_to_64 = function
-  | Mjz -> jz
-  | Mjnz -> jnz
-  | Mjlei i -> assert false
-  | Mjgi i -> assert false
+  | Ops.Mjz -> jz
+  | Ops.Mjnz -> jnz
+  | Ops.Mjlei i -> assert false
+  | Ops.Mjgi i -> assert false
 
 let bbranch_to_64 = function
-  | Mjl -> assert false
-  | Mjle -> assert false
+  | Ops.Mjl -> assert false
+  | Ops.Mjle -> assert false
 
 let rec lin (g:Ltltree.cfg) l =
   if not (Hashtbl.mem visited l) then (
@@ -57,37 +90,18 @@ and instr g l = function
   | Ltltree.Ereturn ->
     emit l ret
   | Ltltree.Emunop (op, r, l1) ->
-    let r64 = operand r in
-    emit l (
-      match op with
-      | Maddi i ->
-        addq i r64
-      | Msetei i -> emit_wl (cmpq i r64);
-        sete r64
-      | Msetnei i -> emit_wl (cmpq i r64);
-        setne r64
-    );
+    emit l (unop_to_64 op r);
     lin g l1
   | Ltltree.Embinop (op, r1, r2, l1) ->
-    let r64_1, r64_2 = (operand r1), (operand r2) in
-    emit l (
-      match op with
-      | Mmov | Madd | Msub | Mmul ->
-        (binop_to_64 op) r64_1 r64_2
-      | Mdiv ->
-        idivq r64_1
-      | Msete | Msetne | Msetl | Msetle | Msetg | Msetge ->
-        emit_wl (cmpq r64_1 r64_2);
-        (binop_to_64 op) r64_2
-    );
+    emit l (binop_to_64 op r1 r2);
     lin g l1
   | Ltltree.Eload (r_p1, n, r_p2, l1) ->
-    emit l (movq (ind n (register64 r_p1)) (register64 r_p2)); lin g l1
+    emit l (movq (ind ~ofs:n (register64 r_p1)) (reg (register64 r_p2))); lin g l1
   | Ltltree.Estore (r_p1, r_p2, n, l1) ->
-    emit l (movq (register64 r_p2) (ind n (register64 r_p2)) ); lin g l1
+    emit l (movq (reg (register64 r_p2)) (ind ~ofs:n (register64 r_p2)) ); lin g l1
   | Ltltree.Egoto (l1) ->
     if Hashtbl.mem visited l1 then (
-      emit l (jmp l1); need_label l1
+      emit l (jmp (l1 :> label)); need_label l1
     ) else
       lin g l1
   | Ltltree.Epop (r_p, l1) ->
@@ -95,21 +109,19 @@ and instr g l = function
   | Ltltree.Epush (r, l1) ->
     emit l (pushq (operand r)); lin g l1
   | Ltltree.Emubranch (br, r, lt, lf) ->
-    let r64 = operand r in
+    let r_op = operand r in
     emit_wl (
       match br with
-      | Mjz | Mjnz ->
-        testq r64 r64
-      | Mjlei i | Mjgi i ->
-        cmpq i r64
+      | Ops.Mjz | Ops.Mjnz ->
+        testq r_op r_op
+      | Ops.Mjlei i | Ops.Mjgi i ->
+        cmpq (imm32 i) r_op
     );
-    lin g l1
-
+    assert false
   | Ltltree.Embbranch (n, r1, r2, lt, lf) ->
-    emit l (movq (imm32 n) (operand r)); lin g l1
+    assert false
   | Ltltree.Ecall (id, label) ->
     assert false
-  | _ -> assert false
 
 let deffun text (df: Ltltree.deffun) =
   code := [];
