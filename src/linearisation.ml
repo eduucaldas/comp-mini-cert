@@ -151,6 +151,9 @@ and instr g l = function
   | Ltltree.Embbranch (br, r1, r2, lt, lf) ->
     let brx = bbranch_to_64 br r1 r2 in
     lin_brx g brx lt lf
+  | Ltltree.Ecall (id, l1) ->
+    emit l (call id);
+    lin g l1
 
 let deffun text (df: Ltltree.deffun) =
   code := [];
