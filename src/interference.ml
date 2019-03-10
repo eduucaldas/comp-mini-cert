@@ -85,8 +85,8 @@ let is_some a =
 let pick_r_w_c_pref_known (colored: coloring) ig (r_to_c_possible: Register.S.t Register.map) =
   let pick_c_pref_known_opt r _ =
     let r_prefs = (Register.M.find r ig).prefs in
-    let r_intfs = (Register.M.find r ig).intfs in
-    let r_prefs_to_known_colors = Register.M.filter (fun r c -> (Register.S.mem r r_prefs) && (match c with Ltltree.Reg rc -> not (Register.S.mem rc r_intfs) | _ -> assert false)) colored in
+    let r_possible = Register.M.find r r_to_c_possible in
+    let r_prefs_to_known_colors = Register.M.filter (fun r c -> (Register.S.mem r r_prefs) && (match c with Ltltree.Reg rc -> (Register.S.mem rc r_possible) | _ -> assert false)) colored in
     match (Register.M.choose_opt r_prefs_to_known_colors) with
     | None -> None
     | Some (_, c) -> Some c
