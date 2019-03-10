@@ -111,3 +111,26 @@ and instr g l = function
     assert false
   | _ -> assert false
 
+let deffun text (df: Ltltree.deffun) =
+  code := [];
+  text := !text ++ (label (df.fun_name :> label));
+  lin df.fun_body df.fun_entry;
+  let instr_to_text = function
+    | Code c ->
+      text := !text ++ c
+    | Label l ->
+      if Hashtbl.mem labels l then
+        text := !text ++ (label (l :> label))
+  in
+  List.iter instr_to_text (List.rev !code);
+  if (String.equal df.fun_name "main") then
+    text := (globl df.fun_name) ++ !text
+
+let program (file: Ltltree.file) =
+  let file_text = ref nop in
+  let file_data = ref nop in
+  List.iter (deffun file_text) file.funs;
+  {
+    text = !file_text;
+    data = !file_data
+  }
