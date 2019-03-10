@@ -1,1 +1,1 @@
-val program: Ertltree.file -> Rtltree.file
+val program: Ertltree.file -> Ltltree.file
