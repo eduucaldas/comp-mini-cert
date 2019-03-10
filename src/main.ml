@@ -10,6 +10,7 @@ let parse_only = ref false
 let type_only = ref false
 let interp_rtl = ref false
 let interp_ertl = ref false
+let interp_ltl = ref false
 let liveness = ref false
 let debug = ref false
 
@@ -24,6 +25,8 @@ let options =
      "  stops after typing";
    "--interp-rtl", Arg.Set interp_rtl,
      "  interprets RTL (and does not compile)";
+   "--interp-ltl", Arg.Set interp_ltl,
+     "  interprets LTL (and does not compile)";
    "--interp-ertl", Arg.Set interp_ertl,
      "  interprets ERTL (and does not compile)";
    "--liveness", Arg.Set liveness,
@@ -66,6 +69,9 @@ let () =
     if !interp_ertl then begin ignore (Ertlinterp.program p); exit 0 end;
     if debug then Life.print_with_liveness std_formatter p;
     if debug then Interference.print_file std_formatter p;
+    let p = Ltl.program p in
+    if debug then Ltltree.print_file std_formatter p;
+    if !interp_ltl then begin ignore (Ltlinterp.program p); exit 0 end;
     (* ... *)
   with
     | Lexer.Lexical_error c ->
