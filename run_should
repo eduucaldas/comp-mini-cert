@@ -1,0 +1,8 @@
+#!/bin/bash
+compile="gcc -no-pie"
+file_base=$1
+dir="$(dirname $0)/tests/exec-devil/"
+
+$compile "${dir}${file_base}.c"
+./a.out
+

@@ -1,0 +1,10 @@
+#!/bin/bash
+file_base=$1
+dir="$(dirname $0)/tests/exec-devil/"
+compile="$(dirname $0)/mini-c"
+assembler="gcc -no-pie"
+
+$compile "${dir}${file_base}.c" &&
+$assembler "${dir}${file_base}.s" &&
+./a.out
+
