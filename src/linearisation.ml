@@ -20,18 +20,8 @@ let operand = function
 
 let operandB = function
   | Ltltree.Reg r -> reg (register8 (register64 r))
-  | _ -> assert false
-
-let bset_to_64 op r1 r2 =
-  let rb2 = operandB r2 in
-  match op with
-  | Ops.Msete -> sete rb2
-  | Ops.Msetne -> setne rb2
-  | Ops.Msetl -> setl rb2
-  | Ops.Msetle -> setle rb2
-  | Ops.Msetg -> setg rb2
-  | Ops.Msetge -> setge rb2
-  | _ -> assert false
+  | Ltltree.Spilled fs ->
+    reg (register8 (register64 Register.tmp1))
 
 let barith_to_64 op r1 r2 =
   let rb1 = operand r1 in
@@ -43,12 +33,28 @@ let barith_to_64 op r1 r2 =
   | Ops.Mdiv -> emit_wl cqto; idivq rb1
   | _ -> assert false
 
-let binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) =
+let emit_binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) l =
   match op with
-  | Ops.Mmov | Ops.Madd | Ops.Msub | Ops.Mmul | Ops.Mdiv -> barith_to_64 op r1 r2
-  | Ops.Msete | Ops.Msetne | Ops.Msetl | Ops.Msetle | Ops.Msetg | Ops.Msetge ->
-    emit_wl (cmpq (operand r1) (operand r2));
-    bset_to_64 op r1 r2
+  | Ops.Mmov | Ops.Madd | Ops.Msub | Ops.Mmul | Ops.Mdiv -> emit l (barith_to_64 op r1 r2)
+  | Ops.Msete | Ops.Msetne | Ops.Msetl | Ops.Msetle | Ops.Msetg | Ops.Msetge -> (
+      emit_wl (cmpq (operand r1) (operand r2));
+      emit_wl (movq (imm32 Int32.zero) (operand r2));
+      let rb2 = operandB r2 in
+      (match op with
+       | Ops.Msete  -> emit l (sete  rb2)
+       | Ops.Msetne -> emit l (setne rb2)
+       | Ops.Msetl  -> emit l (setl  rb2)
+       | Ops.Msetle -> emit l (setle rb2)
+       | Ops.Msetg  -> emit l (setg  rb2)
+       | Ops.Msetge -> emit l (setge rb2)
+       | _ -> assert false
+      );
+      (match r2 with
+       | Ltltree.Spilled fs -> emit_wl (movb rb2 (ind ~ofs:fs rbp))
+       | _ -> ()
+      )
+    )
+
 
 let unop_to_64 (op:Ops.munop) (r:Ltltree.operand) =
   let r_op = operand r in
@@ -104,7 +110,7 @@ let rec lin (g:Ltltree.cfg) l =
     need_label l;
     emit_wl (jmp (l :> string))
   )
-  (*dont forget optimisation *)
+(*dont forget optimisation *)
 and lin_brx (g:Ltltree.cfg) brx lt lf l =
   let lt_seen, lf_seen = Hashtbl.mem visited lt, Hashtbl.mem visited lf in
   if not lf_seen || not lt_seen then (
@@ -128,7 +134,7 @@ and instr g l = function
     emit l (unop_to_64 op r);
     lin g l1
   | Ltltree.Embinop (op, r1, r2, l1) ->
-    emit l (binop_to_64 op r1 r2);
+    emit_binop_to_64 op r1 r2 l;
     lin g l1
   | Ltltree.Eload (r_p1, n, r_p2, l1) ->
     emit l (movq (ind ~ofs:n (register64 r_p1)) (reg (register64 r_p2)));
@@ -142,7 +148,7 @@ and instr g l = function
       need_label l1
     ) else
       code := Label l :: !code; (*ugly*)
-      lin g l1
+    lin g l1
   | Ltltree.Epop (r_p, l1) ->
     emit l (popq (register64 r_p)); lin g l1
   | Ltltree.Epush (r, l1) ->
