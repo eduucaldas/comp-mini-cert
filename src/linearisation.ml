@@ -20,17 +20,16 @@ let operand = function
 
 let operandB = function
   | Ltltree.Reg r -> reg (register8 (register64 r))
-  | Ltltree.Spilled fs ->
-    reg (register8 (register64 Register.tmp1))
+  | Ltltree.Spilled fs -> reg (register8 (register64 Register.tmp1))
 
 let barith_to_64 op r1 r2 =
-  let rb1 = operand r1 in
+  let rq1 = operand r1 in
   match op with
-  | Ops.Mmov ->  movq rb1 (operand r2)
-  | Ops.Madd ->  addq rb1 (operand r2)
-  | Ops.Msub ->  subq rb1 (operand r2)
-  | Ops.Mmul -> imulq rb1 (operand r2)
-  | Ops.Mdiv -> emit_wl cqto; idivq rb1
+  | Ops.Mmov ->  movq rq1 (operand r2)
+  | Ops.Madd ->  addq rq1 (operand r2)
+  | Ops.Msub ->  subq rq1 (operand r2)
+  | Ops.Mmul -> imulq rq1 (operand r2)
+  | Ops.Mdiv -> emit_wl cqto; idivq rq1
   | _ -> assert false
 
 let emit_binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) l =
@@ -57,15 +56,15 @@ let emit_binop_to_64 (op:Ops.mbinop) (r1:Ltltree.operand) (r2:Ltltree.operand) l
 
 
 let unop_to_64 (op:Ops.munop) (r:Ltltree.operand) =
-  let r_op = operand r in
+  let rq = operand r in
   match op with
   | Ops.Maddi i ->
-    addq (imm32 i) r_op
+    addq (imm32 i) rq
   | Ops.Msetei i ->
-    emit_wl (cmpq (imm32 i) r_op);
+    emit_wl (cmpq (imm32 i) rq);
     sete (operandB r)
   | Ops.Msetnei i ->
-    emit_wl (cmpq (imm32 i) r_op);
+    emit_wl (cmpq (imm32 i) rq);
     setne (operandB r)
 
 let ubranch_to_64 br r =
@@ -84,23 +83,7 @@ let bbranch_to_64 br r1 r2 =
   match br with
   | Ops.Mjl -> jl
   | Ops.Mjle -> jle
-(*
-let opp_brx br =
-  if br = jz  then jnz else
-  if br = jne then je  else
-  if br = jnz then jz  else
-  if br = js  then jns else
-  if br = jns then js  else
-  if br = jg  then jle else
-  if br = jge then jl  else
-  if br = jl  then jge else
-  if br = jle then jg  else
-  if br = ja  then jbe else
-  if br = jae then jb  else
-  if br = jb  then jae else
-  if br = jbe then ja  else
-    assert false
-*)
+
 let rec lin (g:Ltltree.cfg) l =
   if not (Hashtbl.mem visited l) then (
     Hashtbl.add visited l ();
@@ -110,6 +93,7 @@ let rec lin (g:Ltltree.cfg) l =
     need_label l;
     emit_wl (jmp (l :> string))
   )
+
 (*dont forget optimisation *)
 and lin_brx (g:Ltltree.cfg) brx lt lf l =
   let lt_seen, lf_seen = Hashtbl.mem visited lt, Hashtbl.mem visited lf in
