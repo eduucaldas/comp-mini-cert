@@ -17,7 +17,9 @@ This will generate a ``mini-c`` file
 To compile and run a ``.c`` file with the Mini-C Compiler, using the ERTL Interpreter, do:
 
 ```
-$ ./mini-c --debug --interp-ertl test.c
+$ ./mini-c test.c
+$ gcc test.s -o test -no-pie
+$ ./test
 ```
 
 ## Tests
@@ -29,7 +31,7 @@ $ ./run -i "../mini-c --interp-ertl"
 ```
 
 
-*Developed by:*
+### *Developed by:*
 
 *[Eduardo Caldas](https://github.com/eduucaldas)*
 
