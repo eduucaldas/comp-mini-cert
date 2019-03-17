@@ -53,7 +53,7 @@ let make l_to_li =
   in
   Hashtbl.iter add_arcs_from_li l_to_li;
 
-  (*clean edges both in interference and preference*)
+  (* clean edges both in interference and preference *)
   Register.M.iter (fun _ a -> a.prefs <- Register.S.diff a.prefs a.intfs) !graph;
   !graph
 
@@ -81,7 +81,8 @@ let is_some a =
   | None -> false
   | _ -> true
 
-(* Refacto needed *)
+(* Oh, is it too late now to say sorry?
+   We didn't had the time to refactor it *)
 let pick_r_w_c_pref_known (colored: coloring) ig (r_to_c_possible: Register.S.t Register.map) =
   let pick_c_pref_known_opt r _ =
     let r_prefs = (Register.M.find r ig).prefs in

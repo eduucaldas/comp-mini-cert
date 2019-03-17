@@ -94,7 +94,7 @@ let rec lin (g:Ltltree.cfg) l =
     emit_wl (jmp (l :> string))
   )
 
-(*dont forget optimisation *)
+(* Can optimise! *)
 and lin_brx (g:Ltltree.cfg) brx lt lf l =
   let lt_seen, lf_seen = Hashtbl.mem visited lt, Hashtbl.mem visited lf in
   if not lf_seen || not lt_seen then (
@@ -131,7 +131,7 @@ and instr g l = function
       emit l (jmp (l1 :> label));
       need_label l1
     ) else
-      code := Label l :: !code; (*ugly*)
+      code := Label l :: !code;
     lin g l1
   | Ltltree.Epop (r_p, l1) ->
     emit l (popq (register64 r_p)); lin g l1
