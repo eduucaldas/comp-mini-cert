@@ -14,20 +14,23 @@ This will generate a ``mini-c`` file
 
 ## Run
 
-To compile and run a ``.c`` file with the Mini-C Compiler, using the ERTL Interpreter, do:
-
+To compile and run a ``.c`` file with the Mini-C Compiler, do:
 ```
 $ ./mini-c test.c
+```
+
+This will generate a ``.s`` file with the assembly code. Then, to generate and run the executable file, do:
+```
 $ gcc test.s -o test -no-pie
 $ ./test
 ```
 
 ## Tests
 
-To run the tests with the ERTL Interpreter, do:
+To run the tests, do:
 ```
 $ cd tests
-$ ./run -i "../mini-c --interp-ertl"
+$ ./run -3 ../mini-c
 ```
 
 
